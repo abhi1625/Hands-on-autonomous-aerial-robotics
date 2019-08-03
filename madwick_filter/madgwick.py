@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-# coding: utf-8
-
-# In[2]:
 
 
 from pyquaternion import Quaternion
@@ -16,54 +13,38 @@ pd.set_option('display.float_format', lambda x: '%.4f' % x)
 import csv
 
 
-# In[4]:
-
-
 qa = Quaternion(1,0,0,0)
 a1,a2,a3,a4 = qa
 print(a1,a2,a3,a4)
 # np.set_printoptions(linewidth=np.inf)
 np.set_printoptions(precision=5)
 
-
-# In[7]:
-
-
 imu_data_orig = scipy.io.loadmat('./ExampleData.mat')
 
 
-# In[ ]:
-
-
-
-
-
-# In[9]:
-
-
-print(imu_data_orig['Accelerometer'].shape,imu_data_orig['Gyroscope'].shape,imu_data_orig['Gyroscope'].shape[0])
+# print(imu_data_orig['Accelerometer'].shape,imu_data_orig['Gyroscope'].shape,imu_data_orig['Gyroscope'].shape[0])
 
 
 # In[10]:
 
 
-print(np.amax(imu_data_orig['Gyroscope']),np.amax(imu_data_orig['Accelerometer'][:100]))
+# print(np.amax(imu_data_orig['Gyroscope']),np.amax(imu_data_orig['Accelerometer'][:100]))
 
 
 # In[11]:
 
 
 np.set_printoptions(threshold=sys.maxsize)
-print(imu_data_orig['Gyroscope'][:20])
+# print(imu_data_orig['Gyroscope'][:20])
 
 
 # In[12]:
 
 
-qa = Quaternion(1,0,0,0)
-print(qa)
-w,x,y,z = qa
-print(w,x,y,z)
+# qa = Quaternion(1,0,0,0)
+# print(qa)
+# w,x,y,z = qa
+# print(w,x,y,z)
 
 
 # In[13]:
