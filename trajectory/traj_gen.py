@@ -12,9 +12,15 @@ from geometry_msgs.msg import Twist
 #t_prev = 0
 
 def circle_traj():
+	circle_flag=False
+	rhombus_flag=False
+	sawtooth_flag=True
 	t=0
-	dt = 0.01 # 0.05sec
-	Kp = [1.8, 1, 1] # [x,y,z]
+	#dt = 0.01 circle
+	#dt = 0.1  rhombus
+	dt = 0.1 #sawtooth  
+	#Kp = [1.8, 1, 2.0] # [x,y,z]
+	Kp = [1.8,1,1.5]	
 	radius = 1 # 0.5m
 	T = 1 #time taken to complete a circle
 	pi = np.pi
@@ -29,7 +35,7 @@ def circle_traj():
 	del_x_plot = []
 	del_y_plot = []
 	
-	NumTurns = 2
+	NumTurns = 1
 
 	angle = 2*pi*t/T
 	#Publisher
@@ -42,20 +48,98 @@ def circle_traj():
 	x_prev = 0
 	y_prev = -radius
 	z_prev = 0
-	while ((not rospy.is_shutdown()) and (angle<=NumTurns*2*pi)):
-	#while ((not rospy.is_shutdown()) and (n<10)):
+	count =1 
+	x=0
+	y=0
+	z=0
+	while ((not rospy.is_shutdown()) and (count<5)):    #(t<=2)):          #(angle<=NumTurns*2*pi)):
+		#while ((not rospy.is_shutdown()) and (n<10)):
 		angle = 2*pi*t/T
 		# print("angle = ",angle)
 		# print("cos = ",math.cos(angle))
-		x = radius*math.cos(angle-pi/2)
-		y = radius*math.sin(angle-pi/2)
+		if circle_flag:
+			x = radius*math.cos(angle-pi/2)
+			y = radius*math.sin(angle-pi/2)
+
+			del_x = x - x_prev
+			del_y = y - y_prev
+			del_z = z - z_prev
 		
-		del_x = x - x_prev
-		del_y = y - y_prev
-		del_z = 0.08
+		elif rhombus_flag:
+			if count ==1:
+				x = t 
+				y = t
+				z = t
+				del_x = x - x_prev
+				del_y = y - y_prev
+				del_z = z - z_prev
+				if t>=1.9:
+					count+=1
+					t=0
+					x_prev=0
+					y_prev=0
+					z_prev=0
+			if count ==2:
+				x = -t 
+				y = t
+				z = t
+				del_x = x - x_prev
+				del_y = y - y_prev
+				del_z = z - z_prev
+				if t>=1.9:
+					count+=1
+					t=0
+					x_prev=0
+					y_prev=0
+					z_prev=0
+			if count ==3:
+				x = -t 
+				y = -t
+				z = -t
+				del_x = x - x_prev
+				del_y = y - y_prev
+				del_z = z - z_prev
+				if t>=1.9:
+					count+=1
+					t=0
+					x_prev=0
+					y_prev=0
+					z_prev=0
+			if count ==4:
+				x = t 
+				y = -t
+				z = -t
+				del_x = x - x_prev
+				del_y = y - y_prev
+				del_z = z - z_prev
+				#if t>=0.9:
+				#	count+=1
+
+ 		elif sawtooth_flag:
+			if count%2 ==0:
+				del_x = -1.2*dt
+				del_y = dt
+				del_z = dt
+				if t>1.9:
+					count+=1
+					t=0
+					del_x = 0
+					del_y = 0
+					del_z = 0
+			else:
+				del_x = 1.2*dt
+				del_y = dt
+				del_z = dt
+				if t>1.9:
+					count+=1
+					t=0
+					del_x = 0
+					del_y = 0
+					del_z = 0
+			
 		
-		x_plot.append(x)
-		y_plot.append(y)
+		#x_plot.append(x)
+		#y_plot.append(y)
 		del_x_plot.append(del_x)
 		del_y_plot.append(del_y)
 		t_plot.append(t)
@@ -63,6 +147,7 @@ def circle_traj():
 		#Update terms
 		x_prev = x
 		y_prev = y
+		z_prev = z
 
 		velocity_msg.linear.x = Kp[0]*del_x
 		velocity_msg.linear.y = Kp[1]*del_y
