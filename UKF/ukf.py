@@ -10,6 +10,7 @@ class UKF():
         self.Q                                                #Process Noise
         self.R                                                #Measurement Noise
         self.n = 6                                            #Number of independant state variabls
+        
     def quaternion_multiply(self,quaternion1, quaternion0):
         w0, x0, y0, z0 = quaternion0
         w1, x1, y1, z1 = quaternion1
@@ -55,6 +56,13 @@ class UKF():
 
         return sigma_pts
 
-    
+    def intrinsicGradientDescent(self, sigma_pts, qbar, thld, MaxIter):
+        num_pts = sigma_pts.shape()[1]
+        err_vectors =np.zeros(num_pts,1) 
+        for i in range():
+            qi = sigma_pts(:-3)[:,i]
+            err_vectors[i] = self.quaternion_multiply(qinv(qbar), qi)
+
+            
         
         
