@@ -2,7 +2,7 @@ import numpy as np
 import math
 # import pyquaternion as quat
 
-class UKF():
+class UKF:
     def __init__(init_state=np.array([1,0,0,0,0,0,0]), P0 = np.zeros((6,6))):
         self.dt
         self.state = init_state                               #initial state
@@ -123,19 +123,24 @@ class UKF():
             Z[:,i] = np.concatenate([quat2RV(quat),Y[-3:,i]],axis=0)
         return Z
 
-    def compute_z_mean(self,Z):
+    def compute_Z_mean(self,Z):
         return np.mean(Z,axis=1)
 
     def Z_mean_centered(self, Z):
-        Z_mean = compute_z_mean(Z)
+        # center the Z around mean
+        Z_mean = self.compute_Z_mean(Z)
         Z_centered = Z - Z_mean
         return Z_centered
 
-    def Compute_vk(self, acc, gyro):
+    def Compute_Vk(self, acc, gyro, Z):
         #compute the innovation term vk
-         
+        Zk = np.hstack((acc,gyro))
+        Vk = Zk - self.compute_Z_mean(Z)
+        return Vk
 
-        return
+    def Compute_covariences(Z_mean_centered, R):
+        num_pts = Z_mean_centered.shape()[1]
+        Pzz = (1/(2*num_pts))*np.matmul(W_dash,W_dash.T)
 
 
 
