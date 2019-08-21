@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 try:
 	sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages/')
+	sys.path.remove('/opt/ros/kinetic/share/opencv3/')
 except:
 	pass
 
@@ -145,6 +146,54 @@ class Window_detection:
 
 		return np.squeeze(corners)
 
+	def pnp(self, corner_pts,img):
+		# corner_pts are in [c,r] format
+		print("corners = ", corner_pts)
+		distances = corner_pts[:,0]**2 + corner_pts[:,1]**2
+		h,w = img.shape[:2]
+		print("h,w",h,w)
+		left_pt = np.argmin(distances)
+		left_top_corner = corner_pts[7,:]
+
+		distances = (corner_pts[:,0]-w)**2 + (corner_pts[:,1])**2
+		right_top_corner = corner_pts[np.argmin(distances),:]
+
+		bottom_most_pt = np.argmax(corner_pts[:,1])
+		corner_pts = np.delete(corner_pts,bottom_most_pt,0)
+
+
+		distances = (corner_pts[:,0]-w)**2 + (corner_pts[:,1]-h)**2
+		right_bottom_corner = corner_pts[np.argmin(distances),:]
+
+		distances = corner_pts[:,0]**2 + (corner_pts[:,1]-h)**2
+		left_bottom_corner = corner_pts[np.argmin(distances),:]
+
+		circle_img = copy.deepcopy(img)
+		cv2.circle(circle_img,tuple(left_bottom_corner),8,255,-1)
+		objPoints = np.array([[0,0,0],
+							 [61,0,0],
+							 [61,91,0],
+							 [0,91,0]])
+		imgPoints = np.array([[left_top_corner],
+							  [right_top_corner],
+							  [right_bottom_corner],
+							  [left_bottom_corner]])
+		imgPoints = np.squeeze(imgPoints)
+		print(objPoints.shape)
+		print(imgPoints.shape)
+		camMatrix = np.array([[400, 0 , w/2],[0, 400, h/2],[0,0,1]])
+		distCoeffs = np.array([0,0,0,0,0])
+
+		_, rotVec, transVec = cv2.solvePnP(objPoints,imgPoints, camMatrix, distCoeffs)
+
+		print(rotVec, transVec)
+		# cv2.imshow('image',circle_img)
+		# cv2.waitKey(0)
+		# cv2.destroyAllWindows()
+
+		print("right_top_corner = ",right_top_corner)
+
+
 
 
 	def Detection_using_threshold(self):
@@ -163,12 +212,15 @@ class Window_detection:
 				# img_pink = np.logical_and(img[:,:,2]>185,img[:,:,0]>120, img[:,:,1]<100)
 				img_pink = np.dstack((img_pink,img_pink,img_pink))
 				img_pink = img_pink*img
-				cv2.imshow('image',img_pink)
-				cv2.waitKey(0)
-				cv2.destroyAllWindows()
+				# circle_img = copy.deepcopy(img_pink)
+				# cv2.circle(circle_img,(160,0),8,255,-1)
+
+				# cv2.imshow('image',circle_img)
+				# cv2.waitKey(0)
+				# cv2.destroyAllWindows()
 
 				corner_pts = self.get_hough_lines(img_pink,img)
-				self.pnp(corner_pts)
+				self.pnp(corner_pts,img)
 				print(corner_pts.shape)
 			if cv2.waitKey(1)& 0xff==ord('q'):
 				cv2.destroyAllWindows()
