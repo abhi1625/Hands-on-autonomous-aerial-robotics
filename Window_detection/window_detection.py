@@ -14,7 +14,7 @@ from sklearn import linear_model, datasets
 
 class Window_detection:
 	def __init__(self):
-		self.data_path = '/home/pratique/drone_course_data/window_detection/pink_window.mp4'
+		self.data_path = '/home/prgumd/Desktop/pink_window.mp4'
 
 	def rotate_img_90_deg(self,img):
 		h,w = img.shape[:2]
@@ -173,23 +173,34 @@ class Window_detection:
 		objPoints = np.array([[0,0,0],
 							 [61,0,0],
 							 [61,91,0],
-							 [0,91,0]])
+							 [0,91,0]], dtype=np.float64)
 		imgPoints = np.array([[left_top_corner],
 							  [right_top_corner],
 							  [right_bottom_corner],
-							  [left_bottom_corner]])
+							  [left_bottom_corner]],dtype=np.float64)
 		imgPoints = np.squeeze(imgPoints)
 		print(objPoints.shape)
 		print(imgPoints.shape)
-		camMatrix = np.array([[400, 0 , w/2],[0, 400, h/2],[0,0,1]])
-		distCoeffs = np.array([0,0,0,0,0])
+		camMatrix = np.array([[400, 0 , w/2],[0, 400, h/2],[0,0,1]],dtype=np.float32)
+		distCoeffs = np.array([0,0,0,0,0],dtype=np.float64)
 
 		_, rotVec, transVec = cv2.solvePnP(objPoints,imgPoints, camMatrix, distCoeffs)
 
 		print(rotVec, transVec)
-		# cv2.imshow('image',circle_img)
-		# cv2.waitKey(0)
-		# cv2.destroyAllWindows()
+
+                #Verification
+                reprojPoints,_ = cv2.projectPoints(objPoints, rotVec, transVec, camMatrix, distCoeffs)
+                reprojPoints = np.squeeze(reprojPoints)
+                print(reprojPoints.shape)
+                print(img.shape)
+                for i in range(4):
+                        pt = reprojPoints[i]
+                        imgpt = imgPoints[i]
+                        cv2.circle(img, (int(pt[0]), int(pt[1])),5,[255,0,0],-1)
+                        cv2.circle(img, (int(imgpt[0]),int(imgpt[1])),5,[0,255,0],-1)
+                cv2.imshow('image',img)
+		cv2.waitKey(0)
+		cv2.destroyAllWindows()
 
 		print("right_top_corner = ",right_top_corner)
 
