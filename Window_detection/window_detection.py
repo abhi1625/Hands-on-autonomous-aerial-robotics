@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import math
 import copy
-from sklearn import linear_model, datasets
+
 
 
 class Window_detection:
@@ -36,11 +36,9 @@ class Window_detection:
 		# print("canny type", np.shape(edges))
 		cv2.imshow('image',edges)
 		kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(31,31))
+		# closing to fill unwanted small gaps
 		closing = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
-		B_mask = np.uint8((closing[:]>100)*255)
-
-		closing_3d = np.dstack((closing,closing,closing))
-
+		
 		closing = cv2.GaussianBlur(closing, (7,7), cv2.BORDER_DEFAULT)
 		corners = cv2.goodFeaturesToTrack(closing, 111, 0.1, 30)
 		for pts in corners:
@@ -122,10 +120,10 @@ class Window_detection:
 	def Detection_using_threshold(self):
 		vidcap = cv2.VideoCapture(self.data_path)
 		count = 0
-		while count <50:
+		while count <250:
 			success,img = vidcap.read()
 		# while count<1:
-			if((count<50) and(count%40 ==0)):
+			if((count<250) and(count%40 ==0)):
 				# print("image dim = ",np.shape(img))
 				print('Read frame # ', count+1)
 				
@@ -138,7 +136,7 @@ class Window_detection:
 				corner_pts = self.get_all_corners(img_pink,img)
 				imgPoints = self.get_outer_window_corner_points(corner_pts, img)
 				print ("imgPoints = ",imgPoints)
-				self.pnp(imgPoints,img)
+				rotVec,transVec = self.pnp(imgPoints,img)
 				
 			if cv2.waitKey(1)& 0xff==ord('q'):
 				cv2.destroyAllWindows()
