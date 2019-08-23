@@ -68,8 +68,8 @@ class BullsEyeDetection:
 
 				
 		def detect_ellipse_hough(self,img):
-				gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-				gray = cv2.medianBlur(gray,5)
+				# gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+				gray = cv2.medianBlur(img,5)
 				cimg = cv2.cvtColor(gray,cv2.COLOR_GRAY2BGR)
 				# edges = cv2.Canny(gray,50,150,apertureSize = 3)
 				# cv2.imshow('edges', edges)
