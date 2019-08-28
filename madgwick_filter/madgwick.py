@@ -147,8 +147,25 @@ class madgwick:
         return np.reshape(self.q_new,(4,))
 
 
-# In[19]:
 
+def process_data(acc,acc_scale,acc_bias,gyro):
+    acc_data = np.multiply(acc_scale[:,np.newaxis],acc[:,start+count][:,np.newaxis])
+    acc_data = acc_data + acc_bias[:,np.newaxis]
+    acc_data = acc_data[:,0]
+    gyro_data = 3300/1023*np.pi/180*(1/3.33)*gyro[:,start+count]
+
+    return acc_data, gyro_data
+
+
+
+imu_params = loadmat('/home/pratique/git_cloned_random/ESE650Project2-master/Preprocess/IMUParams.mat')
+acc_scale = imu_params['IMUParams'][0]
+acc_bias = imu_params['IMUParams'][1]
+data = loadmat('../../drone_course_data/UKF/imu/imuRaw2.mat')
+acc = data['vals'][:3,:]
+gyro = data['vals'][-3:,:]
+
+acc_all,gyro_all = process_data(acc,acc_scale,acc_bias,gyro)
 
 imu_data_orig = scipy.io.loadmat('./ExampleData.mat')
 thresh = len(imu_data_orig['Accelerometer'])-1
@@ -167,6 +184,7 @@ employee_file = open('my_madwick.csv', mode='w')
 quat_file  = open('quat_my_madwick.csv', mode='w')
 employee_writer = csv.writer(employee_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 quat_writer = csv.writer(quat_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+input('aa')
 while i<=thresh:
     
 #     print i+1
@@ -249,81 +267,9 @@ a9 = plt.subplot(3,3,9)
 plt.plot(t_angles,angles[:,2],'b-')
 a9.title.set_text('Z-madgwick')
 
-# plt.figure(figsize=(20,20))
-# b1 = plt.subplot(2,2,1)
-# plt.plot(t,angles[:,0],'r-')
-# b1.title.set_text('X-madgwick')
-
-# b2 =  plt.subplot(2,2,2)
-# plt.plot(t,angles[:,1],'g-')
-# b2.title.set_text('Y-madgwick')
-
-# b3 = plt.subplot(2,2,3)
-# plt.plot(t,angles[:,2],'b-')
-# b3.title.set_text('Z-madgwick')
-
-
-# In[21]:
-
 
 print(len(angles))
 
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[22]:
 
 plt.close
 acc_all = imu_data_orig['Accelerometer']
