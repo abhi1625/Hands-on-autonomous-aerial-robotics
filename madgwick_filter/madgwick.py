@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#! /usr/bin/env python3
 
 
 from pyquaternion import Quaternion
@@ -13,41 +13,41 @@ pd.set_option('display.float_format', lambda x: '%.4f' % x)
 import csv
 
 
-qa = Quaternion(1,0,0,0)
-a1,a2,a3,a4 = qa
-print(a1,a2,a3,a4)
-# np.set_printoptions(linewidth=np.inf)
-np.set_printoptions(precision=5)
-
-imu_data_orig = scipy.io.loadmat('./ExampleData.mat')
-
-
-# print(imu_data_orig['Accelerometer'].shape,imu_data_orig['Gyroscope'].shape,imu_data_orig['Gyroscope'].shape[0])
-
-
-# In[10]:
-
-
-# print(np.amax(imu_data_orig['Gyroscope']),np.amax(imu_data_orig['Accelerometer'][:100]))
-
-
-# In[11]:
-
-
-np.set_printoptions(threshold=sys.maxsize)
-# print(imu_data_orig['Gyroscope'][:20])
-
-
-# In[12]:
-
-
 # qa = Quaternion(1,0,0,0)
-# print(qa)
-# w,x,y,z = qa
-# print(w,x,y,z)
+# a1,a2,a3,a4 = qa
+# print(a1,a2,a3,a4)
+# # np.set_printoptions(linewidth=np.inf)
+# np.set_printoptions(precision=5)
+
+# imu_data_orig = scipy.io.loadmat('./ExampleData.mat')
 
 
-# In[13]:
+# # print(imu_data_orig['Accelerometer'].shape,imu_data_orig['Gyroscope'].shape,imu_data_orig['Gyroscope'].shape[0])
+
+
+# # In[10]:
+
+
+# # print(np.amax(imu_data_orig['Gyroscope']),np.amax(imu_data_orig['Accelerometer'][:100]))
+
+
+# # In[11]:
+
+
+# np.set_printoptions(threshold=sys.maxsize)
+# # print(imu_data_orig['Gyroscope'][:20])
+
+
+# # In[12]:
+
+
+# # qa = Quaternion(1,0,0,0)
+# # print(qa)
+# # w,x,y,z = qa
+# # print(w,x,y,z)
+
+
+# # In[13]:
 
 
 def quat_to_euler(q):
@@ -148,30 +148,41 @@ class madgwick:
 
 
 
-def process_data(acc,acc_scale,acc_bias,gyro):
-    acc_data = np.multiply(acc_scale[:,np.newaxis],acc[:,start+count][:,np.newaxis])
-    acc_data = acc_data + acc_bias[:,np.newaxis]
-    acc_data = acc_data[:,0]
-    gyro_data = 3300/1023*np.pi/180*(1/3.33)*gyro[:,start+count]
+def process_data(acc_data,acc_scale,acc_bias,gyro):
 
+    acc_data = acc_data + acc_bias[:,np.newaxis]
+    #acc_scale = np.reciprocal(acc_scale)
+    print acc_data[:,0]
+    acc_data[0] = np.multiply(acc_scale[0],acc_data[0])
+    acc_data[1] = np.multiply(acc_scale[1],acc_data[1])
+    acc_data[2] = np.multiply(acc_scale[2],acc_data[2])
+    # print acc_data[:,0]
+    # input('a')
+    gyro_data = 3300/1023*np.pi/180*0.3*gyro[:]
+    # print gyro_data.shape
+    # input('a')
     return acc_data, gyro_data
 
 
 
-imu_params = loadmat('/home/pratique/git_cloned_random/ESE650Project2-master/Preprocess/IMUParams.mat')
+imu_params = scipy.io.loadmat('./IMUParams.mat')
 acc_scale = imu_params['IMUParams'][0]
 acc_bias = imu_params['IMUParams'][1]
-data = loadmat('../../drone_course_data/UKF/imu/imuRaw2.mat')
+#data = scipy.io.loadmat('/home/abhinav/Gits/drone-course/madgwick_filter/YourDirectoryID_p1a/Data/Train/IMU/imuRaw6.mat')
+data = scipy.io.loadmat('./ExampleData.mat')
 acc = data['vals'][:3,:]
+print acc.shape
 gyro = data['vals'][-3:,:]
-
+print gyro.shape
+input('a')
 acc_all,gyro_all = process_data(acc,acc_scale,acc_bias,gyro)
 
-imu_data_orig = scipy.io.loadmat('./ExampleData.mat')
-thresh = len(imu_data_orig['Accelerometer'])-1
-print(thresh)
-acc_all = imu_data_orig['Accelerometer']
-gyro_all = imu_data_orig['Gyroscope']
+imu_data_vicon = scipy.io.loadmat('/home/abhinav/Gits/drone-course/madgwick_filter/YourDirectoryID_p1a/Data/Train/Vicon/viconRot6.mat')
+
+# thresh = len(imu_data_orig['Accelerometer'])-1
+# print(thresh)
+# acc_all = imu_data_orig['Accelerometer']
+# gyro_all = imu_data_orig['Gyroscope']
 q_est = Quaternion(1,0,0,0)
 q_init = Quaternion(1,0,0,0)
 angles = np.array([0,0,0])
@@ -189,11 +200,11 @@ while i<=thresh:
     
 #     print i+1
 #     acc = acc_all[i]
-    acc = np.reshape(acc_all[i], (3,1))
+    acc = np.reshape(acc_all[:,i], (3,1))
 #     print "acc data = ",acc 
 #     gyro = gyro_all[i]
     #print gyro, gyro.shape
-    gyro = np.reshape(gyro_all[i], (3,1))
+    gyro = np.reshape(gyro_all[:,i], (3,1))
 #     print "gyro data orig",gyro
     gyro*=(np.pi/180.0)
 #     print "gyro data deg",gyro
@@ -272,8 +283,8 @@ print(len(angles))
 
 
 plt.close
-acc_all = imu_data_orig['Accelerometer']
-gyro_all = imu_data_orig['Gyroscope']
+# acc_all = imu_data_orig['Accelerometer']
+# gyro_all = imu_data_orig['Gyroscope']
 t = np.linspace(1,int(acc_all.shape[0]),num = int(acc_all.shape[0]))
 
 fig2=plt.figure(2)
