@@ -13,41 +13,6 @@ pd.set_option('display.float_format', lambda x: '%.4f' % x)
 import csv
 
 
-# qa = Quaternion(1,0,0,0)
-# a1,a2,a3,a4 = qa
-# print(a1,a2,a3,a4)
-# # np.set_printoptions(linewidth=np.inf)
-# np.set_printoptions(precision=5)
-
-# imu_data_orig = scipy.io.loadmat('./ExampleData.mat')
-
-
-# # print(imu_data_orig['Accelerometer'].shape,imu_data_orig['Gyroscope'].shape,imu_data_orig['Gyroscope'].shape[0])
-
-
-# # In[10]:
-
-
-# # print(np.amax(imu_data_orig['Gyroscope']),np.amax(imu_data_orig['Accelerometer'][:100]))
-
-
-# # In[11]:
-
-
-# np.set_printoptions(threshold=sys.maxsize)
-# # print(imu_data_orig['Gyroscope'][:20])
-
-
-# # In[12]:
-
-
-# # qa = Quaternion(1,0,0,0)
-# # print(qa)
-# # w,x,y,z = qa
-# # print(w,x,y,z)
-
-
-# # In[13]:
 
 
 def quat_to_euler(q):
@@ -80,7 +45,7 @@ def quaternConj(q):
 
 
 class madgwick:
-    def __init__(self,q=Quaternion(1,0,0,0),beta = 0.1,invSampleFreq = 1.0/256.0 ):
+    def __init__(self,q=Quaternion(1,0,0,0),beta = 0.5,invSampleFreq = 1.0/100.0 ):
         self.beta = beta
         w,x,y,z = q 
         self.q_new = np.array([[w],[x],[y],[z]])
@@ -88,77 +53,90 @@ class madgwick:
         self.counter = 0
     
     def imu_update(self,acc,gyro,q_est):
-        '''
-        INPUT:
-            acc= numpy array of length 3 having three accelerations ax, ay, az
-            gyro= numpy array of length 3 having three angular accelerations gx, gy, gz
+		'''
+		INPUT:
+		    acc= numpy array of length 3 having three accelerations ax, ay, az
+		    gyro= numpy array of length 3 having three angular accelerations gx, gy, gz
 
-        Output:
-            Pose in quaternion
-        '''
+		Output:
+		    Pose in quaternion
+		'''
 
-        if(not(np.linalg.norm(acc)==0)):
-            #normalize acc data
-            acc = np.divide(acc,np.linalg.norm(acc))
-            ax = acc[0]
-            ay = acc[1]
-            az = acc[2]
-            q1,q2,q3,q4 = q_est
-#             print "incomming q = ",q_est
-            f = np.array([2*(q2*q4-q1*q3) - ax,
-                          2*(q1*q2+q3*q4) - ay,
-                          2*(0.5 - q2**2 - q3**2) - az])
-#             print "f =",f
-            J = np.matrix([[-2*q3, 2*q4, -2*q1, 2*q2],
-                           [2*q2, 2*q1, 2*q4, 2*q3],
-                           [0, -4*q2, -4*q3, 0]])
-#             print "J =",J
-            step = np.array(np.matmul(J.T,f))
-#             print "step = ", step,"type = ", type(step),"shape = ", np.shape(step)
+		if(not(np.linalg.norm(acc)==0)):
+		    #normalize acc data
+		    acc = np.divide(acc,np.linalg.norm(acc))
+		    ax = acc[0]
+		    ay = acc[1]
+		    az = acc[2]
+		    q1,q2,q3,q4 = q_est
+		#             print "incomming q = ",q_est
+		    f = np.array([2*(q2*q4-q1*q3) - ax,
+		                  2*(q1*q2+q3*q4) - ay,
+		                  2*(0.5 - q2**2 - q3**2) - az])
+		#             print "f =",f
+		    J = np.matrix([[-2*q3, 2*q4, -2*q1, 2*q2],
+		                   [2*q2, 2*q1, 2*q4, 2*q3],
+		                   [0, -4*q2, -4*q3, 0]])
+		#             print "J =",J
+		    step = np.array(np.matmul(J.T,f))
+		#             print "step = ", step,"type = ", type(step),"shape = ", np.shape(step)
 
-            step = np.divide(step,np.linalg.norm(step))
-#             print "step norm = ",step
-            q_del = self.beta*step
-#             print "q_del = ", q_del," qdel shape = ",np.shape(q_del)
-#             print "gyro_data",gyro,"gyro to quat ", Quaternion(0,gyro[0],gyro[1],gyro[2])
-            gyro_quat = Quaternion(0,gyro[0],gyro[1],gyro[2])
-    #         q_dot = 0.5*quaternion_multiply(q_est, gyro_quat)
-#             print "q_est = ",q_est.q
-#             print "gyro_quat = ",gyro_quat
-            q_dot_ob = (q_est*gyro_quat)
-#             print "qdot mul = ", q_dot_ob
-            q_dot = 0.5*q_dot_ob.q
-            q_dot = np.reshape(q_dot,(4,1))
-#             print "qdot  = ", q_dot
+		    step = np.divide(step,np.linalg.norm(step))
+		#             print "step norm = ",step
+		    q_del = self.beta*step
+		#             print "q_del = ", q_del," qdel shape = ",np.shape(q_del)
+		#             print "gyro_data",gyro,"gyro to quat ", Quaternion(0,gyro[0],gyro[1],gyro[2])
+		    gyro_quat = Quaternion(0,gyro[0],gyro[1],gyro[2])
+		#         q_dot = 0.5*quaternion_multiply(q_est, gyro_quat)
+		#             print "q_est = ",q_est.q
+		#             print "gyro_quat = ",gyro_quat
+		    q_dot_ob = (q_est*gyro_quat)
+		#             print "qdot mul = ", q_dot_ob
+		    q_dot = 0.5*q_dot_ob.q
+		    q_dot = np.reshape(q_dot,(4,1))
+		#             print "qdot  = ", q_dot
 
-        #fuse
-        q_dot_est_new = q_dot-q_del
-#         print "q_dot_final = ", q_dot_est_new
-        self.q_new += q_dot_est_new*self.invSampleFreq
-        self.q_new = np.divide(self.q_new,np.linalg.norm(self.q_new))
-        np.set_printoptions(precision=5)
-#         print "q_new = ", np.reshape(self.q_new,(4,1))
-#         self.q_new = Quaternion(self.q_new)
-        
-#         self.q_new = self.q_new.normalised
-#         a1,a2,a3,a4=self.q_new
-#         self.q_new = np.array([a1,a2,a3,a4])
-        
-        return np.reshape(self.q_new,(4,))
+
+		q_dot_est_new = q_dot-q_del
+		#         print "q_dot_final = ", q_dot_est_new
+		self.q_new += q_dot_est_new*self.invSampleFreq
+		self.q_new = np.divide(self.q_new,np.linalg.norm(self.q_new))
+		np.set_printoptions(precision=5)
+		#         print "q_new = ", np.reshape(self.q_new,(4,1))
+		#         self.q_new = Quaternion(self.q_new)
+
+		#         self.q_new = self.q_new.normalised
+		#         a1,a2,a3,a4=self.q_new
+		#         self.q_new = np.array([a1,a2,a3,a4])
+
+		return np.reshape(self.q_new,(4,))
 
 
 
 def process_data(acc_data,acc_scale,acc_bias,gyro):
 
+    # acc_scale = np.reciprocal(acc_scale)
+    # print acc_data[:,0]
+    print "acc scale",acc_scale
+    print "acc data = ", acc_data[:,0]
+    print("acc_scale shape", acc_scale.shape)
+    acc_data = np.multiply(acc_data,acc_scale[:,np.newaxis])
+    # acc_data[0] = acc_scale[0]*acc_data[0]
+    # acc_data[1] = acc_scale[1]*acc_data[1]
+    # acc_data[2] = acc_scale[2]*acc_data[2]
+
+    print("acc data = ",acc_data[:,0])
+    
     acc_data = acc_data + acc_bias[:,np.newaxis]
-    acc_scale = np.reciprocal(acc_scale)
-    print acc_data[:,0]
-    acc_data[0] = np.multiply(acc_scale[0],acc_data[0])/9.8
-    acc_data[1] = np.multiply(acc_scale[1],acc_data[1])/9.8
-    acc_data[2] = np.multiply(acc_scale[2],acc_data[2])/9.8
+    # print("acc data = ",acc_data[:,0],acc_data.shape)
+    # print("acc bias = ",acc_bias,acc_bias.shape)
+
     # print acc_data[:,0]
     # input('a')
-    gyro_data = (3300/1023)*(np.pi/180)*0.3*gyro[[2,0,1],:]
+    gyro_bias = np.mean(gyro[:,:200],axis = 1)
+    print("gyro bias shape = ",gyro_bias.shape)
+    gyro_data = gyro - gyro_bias[:,np.newaxis]
+    gyro_data = (3300/1023)*(np.pi/180)*(1/3.33)*gyro_data[[2,0,1],:]
     # print gyro_data.shape
     # input('a')
     return acc_data, gyro_data
@@ -174,13 +152,14 @@ def rot2eul(R):
 imu_params = scipy.io.loadmat('./IMUParams.mat')
 acc_scale = imu_params['IMUParams'][0]
 acc_bias = imu_params['IMUParams'][1]
-data = scipy.io.loadmat('/home/abhinav/Gits/drone-course/madgwick_filter/YourDirectoryID_p1a/Data/Train/IMU/imuRaw1.mat')
+data = scipy.io.loadmat('./YourDirectoryID_p1a/Data/Train/IMU/imuRaw1.mat')
 
 acc = data['vals'][:3,:]
+acc = np.float32(acc)
 print acc.shape
 gyro = data['vals'][-3:,:]
 print gyro.shape
-input('a')
+# input('a')
 acc_all,gyro_all = process_data(acc,acc_scale,acc_bias,gyro)
 
 
@@ -193,13 +172,13 @@ q_init = Quaternion(1,0,0,0)
 angles = np.array([0,0,0])
 mk=madgwick(q = q_init)
 thresh = acc_all.shape[1] -1
-print(thresh)
+print("thresh = ",thresh)
 # thresh = 100
 i=0
-employee_file = open('my_madwick.csv', mode='w')
-quat_file  = open('quat_my_madwick.csv', mode='w')
-employee_writer = csv.writer(employee_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-quat_writer = csv.writer(quat_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+# employee_file = open('my_madwick.csv', mode='w')
+# quat_file  = open('quat_my_madwick.csv', mode='w')
+# employee_writer = csv.writer(employee_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+# quat_writer = csv.writer(quat_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
 # input('aa')
 print(acc_all.shape)
 while i<=thresh:
@@ -223,8 +202,8 @@ while i<=thresh:
 #     phi, thetha, psy = euler_angles
     phi,thetha,psy = quat_to_euler(quaternConj(q))
     
-    employee_writer.writerow([phi,thetha,psy])
-    quat_writer.writerow([q[0],q[1],q[2],q[3]])
+    # employee_writer.writerow([phi,thetha,psy])
+    # quat_writer.writerow([q[0],q[1],q[2],q[3]])
     temp = np.array([phi, thetha, psy])
 
     angles= np.vstack((angles,temp))
@@ -240,29 +219,28 @@ angles = angles[1:]
 num=0
 acc_all = acc_all[num:]
 gyro_all = gyro_all[num:]
-
 #PLot vicon data
-imu_data_vicon = scipy.io.loadmat('/home/abhinav/Gits/drone-course/madgwick_filter/YourDirectoryID_p1a/Data/Train/Vicon/viconRot1.mat')
+imu_data_vicon = scipy.io.loadmat('./YourDirectoryID_p1a/Data/Train/Vicon/viconRot1.mat')
 rots = imu_data_vicon['rots']
 vicon_data = np.zeros((3,rots.shape[2]),dtype=np.float32)
 for ang in range(rots.shape[2]):
-    vicon_data[:,ang] = rot2eul(rots[:,:,ang])
+    vicon_data[:,ang] = (180/np.pi)*rot2eul(rots[:,:,ang])
 
-print(vicon_data.shape)
+# print(vicon_data.shape)
 t_vicon = np.linspace(1,vicon_data.shape[1],num=vicon_data.shape[1])
-input('aaaa')
+# input('aaaa')
     
-t = np.linspace(1,int(acc_all.shape[0]),num = int(acc_all.shape[0]))
+t = np.linspace(1,int(acc_all.shape[1]),num = int(acc_all.shape[1]))
 t_angles = np.linspace(1,int(angles.shape[0]),num = int(angles.shape[0]))
 fig=plt.figure(1)
 # plt.rcParams['figure.figsize'] = [10,10]
 
 a1 = plt.subplot(3,4,1)
-plt.plot(t[:thresh],acc_all[:thresh,0],'r-')
+plt.plot(t[:thresh],acc_all[0,:thresh],'r-')
 a1.title.set_text('X-accel')
 
 a2 = plt.subplot(3,4,2)
-plt.plot(t[:thresh],gyro_all[:thresh,0],'r-')
+plt.plot(t[:thresh],gyro_all[0,:thresh],'r-')
 a2.title.set_text('X-gyro')
 
 # print t.shape,angles[:,0].shape
@@ -276,11 +254,11 @@ plt.plot(t_vicon,vicon_data[0,:],'r-')
 a10.title.set_text('X-madgwick')
 
 a4 = plt.subplot(3,4,5)
-plt.plot(t[:thresh],acc_all[:thresh,1],'g-')
+plt.plot(t[:thresh],acc_all[1,:thresh],'g-')
 a4.title.set_text('Y-accel')
 
 a5 = plt.subplot(3,4,6)
-plt.plot(t[:thresh],gyro_all[:thresh,1],'g-')
+plt.plot(t[:thresh],gyro_all[1,:thresh],'g-')
 a5.title.set_text('Y-gyro')
 
 a6 = plt.subplot(3,4,7)
@@ -292,11 +270,11 @@ plt.plot(t_vicon,vicon_data[1,:],'g-')
 a11.title.set_text('Y-madgwick')
 
 a7 = plt.subplot(3,4,9)
-plt.plot(t[:thresh],acc_all[:thresh,2],'b-')
+plt.plot(t[:thresh],acc_all[2,:thresh],'b-')
 a7.title.set_text('Z-accel')
 
 a8 = plt.subplot(3,4,10)
-plt.plot(t[:thresh],gyro_all[:thresh,2],'b-')
+plt.plot(t[:thresh],gyro_all[2,:thresh],'b-')
 a8.title.set_text('Z-gyro')
 
 a9 = plt.subplot(3,4,11)
