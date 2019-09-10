@@ -23,7 +23,7 @@ def quat_to_euler(q):
     R32 = 2*(y*z-w*x)
     R33 = 2*(w**2)-1+2*(z**2)
     if R31**2 >=1.0:
-    	print "true"
+    	# print "true"
     	R31 = 0.99499
     
     phi = math.atan2(R32, R33 )*(180/np.pi);
@@ -120,7 +120,8 @@ def main():
 	imu_params = scipy.io.loadmat('./IMUParams.mat')
 	acc_scale = imu_params['IMUParams'][0]
 	acc_bias = imu_params['IMUParams'][1]
-	data = scipy.io.loadmat('./YourDirectoryID_p1a/Data/Train/IMU/imuRaw1.mat')
+	data = scipy.io.loadmat('./YourDirectoryID_p1a/Data/Train/IMU/imuRaw4.mat')
+	imu_data_vicon = scipy.io.loadmat('./YourDirectoryID_p1a/Data/Train/Vicon/viconRot4.mat')
 
 	acc = data['vals'][:3,:]
 	acc = np.float32(acc)
@@ -164,7 +165,6 @@ def main():
 	acc_all = acc_all[num:]
 	gyro_all = gyro_all[num:]
 	#PLot vicon data
-	imu_data_vicon = scipy.io.loadmat('./YourDirectoryID_p1a/Data/Train/Vicon/viconRot1.mat')
 	rots = imu_data_vicon['rots']
 	vicon_data = np.zeros((3,rots.shape[2]),dtype=np.float32)
 	for ang in range(rots.shape[2]):
