@@ -40,7 +40,7 @@ def quaternConj(q):
 
 
 class madgwick:
-	def __init__(self,q=Quaternion(1,0,0,0),beta = 0.5,invSampleFreq = 1.0/100.0 ):
+	def __init__(self,q=Quaternion(1,0,0,0),beta = 1.5,invSampleFreq = 1.0/100.0 ):
 		self.beta = beta
 		w,x,y,z = q 
 		self.q_new = np.array([[w],[x],[y],[z]])
@@ -79,12 +79,10 @@ class madgwick:
 			step = np.divide(step,np.linalg.norm(step))
 
 			q_del = self.beta*step
-
 			gyro_quat = Quaternion(0,gyro[0],gyro[1],gyro[2])
 			q_dot_ob = (q_est*gyro_quat)
 			q_dot = 0.5*q_dot_ob.q
 			q_dot = np.reshape(q_dot,(4,1))
-			
 			# print("step = ", step, step.shape)
 			self.q_acc += step*self.invSampleFreq
 			self.q_gyro += q_dot*self.invSampleFreq
