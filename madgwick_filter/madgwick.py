@@ -11,14 +11,14 @@ import sys
 import pandas as pd
 pd.set_option('display.float_format', lambda x: '%.4f' % x)
 import csv
-
+import argparse
 
 
 
 def quat_to_euler(q):
     w,x,y,z = q
-    R11 = 2*(w**2)-1+2*(x**2)
-    R21 = 2*(x*y-w*z)
+    R11 = 1-2*(y**2 +z**2)
+    R21 = 2*(w*z + x*y)
     R31 = 2*(x*z+w*y)
     R32 = 2*(y*z-w*x)
     R33 = 2*(w**2)-1+2*(z**2)
@@ -40,7 +40,7 @@ def quaternConj(q):
 
 
 class madgwick:
-	def __init__(self,q=Quaternion(1,0,0,0),beta = 0.9,invSampleFreq = 1.0/100.0 ):
+	def __init__(self,q=Quaternion(1,0,0,0),beta = 1.5,invSampleFreq = 1.0/100.0 ):
 		self.beta = beta
 		w,x,y,z = q 
 		self.q_new = np.array([[w],[x],[y],[z]])
@@ -114,30 +114,65 @@ def rot2eul(R):
     alpha = np.arctan2(R[2,1]/np.cos(beta),R[2,2]/np.cos(beta))
     gamma = np.arctan2(R[1,0]/np.cos(beta),R[0,0]/np.cos(beta))
     return np.array((alpha, beta, gamma))
-                
+
+def rotvec_to_euler(R):
+#     w,x,y,z = q
+#     roll  = math.atan2(2*y*w - 2*x*z, 1 - 2*y*y - 2*z*z)
+#     pitch = math.atan2(2*x*w - 2*y*z, 1 - 2*x*x - 2*z*z)
+#     yaw = math.asin (2*x*y + 2*z*w)
+    R11 = R[0,0]
+    R21 = R[1,0]
+    R31 = R[2,0]
+    R32 = R[2,1]
+    R33 = R[2,2]
+    
+    phi = math.atan2(R32, R33 )*(180/np.pi);
+    theta = -math.atan(R31/math.sqrt(1-R31**2) )*(180/np.pi);
+    psi = math.atan2(R21, R11 )*(180/np.pi);
+    return np.array((phi, theta, psi))
 
 def main():
 	imu_params = scipy.io.loadmat('./IMUParams.mat')
 	acc_scale = imu_params['IMUParams'][0]
 	acc_bias = imu_params['IMUParams'][1]
-	data = scipy.io.loadmat('./YourDirectoryID_p1a/Data/Train/IMU/imuRaw4.mat')
-	imu_data_vicon = scipy.io.loadmat('./YourDirectoryID_p1a/Data/Train/Vicon/viconRot4.mat')
+	Parser = argparse.ArgumentParser()
 
+	Parser.add_argument('--imu_data', default=' ',help="The path of data file being used")
+	Parser.add_argument('--vicon_data', default=' ',help="The path of vicon data file being used")
+	Args = Parser.parse_args()
+
+	imu_data = Args.imu_data
+	vicon_data = Args.vicon_data
+	
+	data = scipy.io.loadmat(imu_data)
+	print data
+	
+	time_stamp = data['ts']
+	# print "ts_imu, ", time_stamp[0]
+	
+	if vicon_data is not ' ':
+		imu_data_vicon = scipy.io.loadmat(vicon_data)
+		ts_vicon = imu_data_vicon['ts']
+		# print "ts_vicon ", ts_vicon[0][0]-time_stamp[0][0]
+	
 	acc = data['vals'][:3,:]
 	acc = np.float32(acc)
 	gyro = np.float32(data['vals'][-3:,:])
 
 	# print gyro.shape
 	# input('a')
+	align_num = 0	
+	align_minus = 30
 	acc_all,gyro_all = process_data(acc,acc_scale,acc_bias,gyro)
 	q_est = Quaternion(1,0,0,0)
 	q_init = Quaternion(1,0,0,0)
-	angles = np.array([0,0,0])
+	angles = np.zeros((align_num,3))
 	acc_pose = np.array([0,0,0])
 	gyro_pose = np.array([0,0,0])
 	mk=madgwick(q = q_init)
 	thresh = acc_all.shape[1] -1
 	i=0
+
 
 	while i<=thresh:
 		acc = np.reshape(acc_all[:,i], (3,1))
@@ -161,74 +196,149 @@ def main():
 		i+=1
 
 	angles = angles[1:]
+
 	num=0
 	acc_all = acc_all[num:]
 	gyro_all = gyro_all[num:]
-	#PLot vicon data
-	rots = imu_data_vicon['rots']
-	vicon_data = np.zeros((3,rots.shape[2]),dtype=np.float32)
-	for ang in range(rots.shape[2]):
-	    vicon_data[:,ang] = (180/np.pi)*rot2eul(rots[:,:,ang])
+	if vicon_data is not ' ':
+		#PLot vicon data
+		rots = imu_data_vicon['rots']
+		vicon_data = np.zeros((3,rots.shape[2]+align_minus),dtype=np.float32)
+		for ang in range(rots.shape[2]):
+		    vicon_data[:,ang+align_minus] = (180/np.pi)*rot2eul(rots[:,:,ang])
 
-	# print(vicon_data.shape)
-	t_vicon = np.linspace(1,vicon_data.shape[1],num=vicon_data.shape[1])
+		# print(vicon_data.shape)
+		t_vicon = np.linspace(1,vicon_data.shape[1],num=vicon_data.shape[1])
 	# input('aaaa')
-	    
+	# print("befpre angle shape = ", angles.shape)
+
+	# app_angles = np.zeros((1,align_num))
+	# angles = np.concatenate(app_angles,angles)
+	print("after angle shape = ", angles.shape)
 	t = np.linspace(1,int(acc_all.shape[1]),num = int(acc_all.shape[1]))
 	t_angles = np.linspace(1,int(angles.shape[0]),num = int(angles.shape[0]))
 	fig=plt.figure(1)
 	# plt.rcParams['figure.figsize'] = [10,10]
+	# if vicon_data is not ' ':
+	# 	a1 = plt.subplot(3,4,1)
+	# 	plt.plot(t[:thresh],acc_all[0,:thresh],'r-')
+	# 	a1.title.set_text('X-accel')
 
-	a1 = plt.subplot(3,4,1)
-	plt.plot(t[:thresh],acc_all[0,:thresh],'r-')
-	a1.title.set_text('X-accel')
+	# 	a2 = plt.subplot(3,4,2)
+	# 	plt.plot(t[:thresh],gyro_all[0,:thresh],'r-')
+	# 	a2.title.set_text('X-gyro')
 
-	a2 = plt.subplot(3,4,2)
-	plt.plot(t[:thresh],gyro_all[0,:thresh],'r-')
-	a2.title.set_text('X-gyro')
+	# 	# print t.shape,angles[:,0].shape
 
-	# print t.shape,angles[:,0].shape
+	# 	a3 = plt.subplot(3,4,3)
+	# 	plt.plot(t_angles,angles[:,0],'r-')
+	# 	a3.title.set_text('X-madgwick')
 
-	a3 = plt.subplot(3,4,3)
-	plt.plot(t_angles,angles[:,0],'r-')
-	a3.title.set_text('X-madgwick')
+	# 	a10 = plt.subplot(3,4,4)
+	# 	plt.plot(t_vicon,vicon_data[0,:],'r-')
+	# 	a10.title.set_text('X-Vicon')
 
-	a10 = plt.subplot(3,4,4)
-	plt.plot(t_vicon,vicon_data[0,:],'r-')
-	a10.title.set_text('X-madgwick')
+	# 	a4 = plt.subplot(3,4,5)
+	# 	plt.plot(t[:thresh],acc_all[1,:thresh],'g-')
+	# 	a4.title.set_text('Y-accel')
 
-	a4 = plt.subplot(3,4,5)
-	plt.plot(t[:thresh],acc_all[1,:thresh],'g-')
-	a4.title.set_text('Y-accel')
+	# 	a5 = plt.subplot(3,4,6)
+	# 	plt.plot(t[:thresh],gyro_all[1,:thresh],'g-')
+	# 	a5.title.set_text('Y-gyro')
 
-	a5 = plt.subplot(3,4,6)
-	plt.plot(t[:thresh],gyro_all[1,:thresh],'g-')
-	a5.title.set_text('Y-gyro')
+	# 	a6 = plt.subplot(3,4,7)
+	# 	plt.plot(t_angles,angles[:,1],'g-')
+	# 	a6.title.set_text('Y-madgwick')
 
-	a6 = plt.subplot(3,4,7)
-	plt.plot(t_angles,angles[:,1],'g-')
-	a6.title.set_text('Y-madgwick')
+	# 	a11 = plt.subplot(3,4,8)
+	# 	plt.plot(t_vicon,vicon_data[1,:],'g-')
+	# 	a11.title.set_text('Y-Vicon')
 
-	a11 = plt.subplot(3,4,8)
-	plt.plot(t_vicon,vicon_data[1,:],'g-')
-	a11.title.set_text('Y-madgwick')
+	# 	a7 = plt.subplot(3,4,9)
+	# 	plt.plot(t[:thresh],acc_all[2,:thresh],'b-')
+	# 	a7.title.set_text('Z-accel')
 
-	a7 = plt.subplot(3,4,9)
-	plt.plot(t[:thresh],acc_all[2,:thresh],'b-')
-	a7.title.set_text('Z-accel')
+	# 	a8 = plt.subplot(3,4,10)
+	# 	plt.plot(t[:thresh],gyro_all[2,:thresh],'b-')
+	# 	a8.title.set_text('Z-gyro')
 
-	a8 = plt.subplot(3,4,10)
-	plt.plot(t[:thresh],gyro_all[2,:thresh],'b-')
-	a8.title.set_text('Z-gyro')
+	# 	a9 = plt.subplot(3,4,11)
+	# 	plt.plot(t_angles,angles[:,2],'b-')
+	# 	a9.title.set_text('Z-madgwick')
 
-	a9 = plt.subplot(3,4,11)
-	plt.plot(t_angles,angles[:,2],'b-')
-	a9.title.set_text('Z-madgwick')
+	# 	a12 = plt.subplot(3,4,12)
+	# 	plt.plot(t_vicon,vicon_data[2,:],'b-')
+	# 	a12.title.set_text('Z-Vicon')
 
-	a12 = plt.subplot(3,4,12)
-	plt.plot(t_vicon,vicon_data[2,:],'b-')
-	a12.title.set_text('Z-madgwick')
+	# else:
+	# 	a1 = plt.subplot(3,3,1)
+	# 	plt.plot(t[:thresh],acc_all[0,:thresh],'r-')
+	# 	a1.title.set_text('X-accel')
 
+	# 	a2 = plt.subplot(3,3,2)
+	# 	plt.plot(t[:thresh],gyro_all[0,:thresh],'r-')
+	# 	a2.title.set_text('X-gyro')
+
+	# 	# print t.shape,angles[:,0].shape
+
+	# 	a3 = plt.subplot(3,3,3)
+	# 	plt.plot(t_angles,angles[:,0],'r-')
+	# 	a3.title.set_text('X-madgwick')
+
+	# 	a4 = plt.subplot(3,3,4)
+	# 	plt.plot(t[:thresh],acc_all[1,:thresh],'g-')
+	# 	a4.title.set_text('Y-accel')
+
+	# 	a5 = plt.subplot(3,3,5)
+	# 	plt.plot(t[:thresh],gyro_all[1,:thresh],'g-')
+	# 	a5.title.set_text('Y-gyro')
+
+	# 	# print t.shape,angles[:,0].shape
+
+	# 	a6 = plt.subplot(3,3,6)
+	# 	plt.plot(t_angles,angles[:,1],'g-')
+	# 	a6.title.set_text('Y-madgwick')
+
+	# 	a7 = plt.subplot(3,3,7)
+	# 	plt.plot(t[:thresh],acc_all[2,:thresh],'b-')
+	# 	a7.title.set_text('Z-accel')
+
+	# 	a8 = plt.subplot(3,3,8)
+	# 	plt.plot(t[:thresh],gyro_all[2,:thresh],'b-')
+	# 	a8.title.set_text('Z-gyro')
+
+	# 	# print t.shape,angles[:,0].shape
+
+	# 	a9 = plt.subplot(3,3,9)
+	# 	plt.plot(t_angles,angles[:,2],'b-')
+	# 	a9.title.set_text('Z-madgwick')
+
+	a1 = plt.subplot(3,1,1)
+	line1, = a1.plot(t_angles,angles[:,0],'r-')
+	line1.set_label('Madgwick')
+	if vicon_data is not ' ':
+		line2, = a1.plot(t_vicon, vicon_data[0,:],'-b')
+		line2.set_label('Vicon')
+		a1.title.set_text('X-data')
+	a1.legend()
+
+	a2 = plt.subplot(3,1,2)
+	line3, = a2.plot(t_angles,angles[:,1],'r-')
+	line3.set_label('Madgwick')
+	if vicon_data is not ' ':
+		line4, = a2.plot(t_vicon, vicon_data[1,:],'-b')
+		line4.set_label('Vicon')
+		a2.title.set_text('Y-data')
+	a2.legend()
+
+	a3 = plt.subplot(3,1,3)
+	line5, = a3.plot(t_angles,angles[:,2],'r-')
+	line5.set_label('Madgwick')
+	if vicon_data is not ' ':
+		line6, = a3.plot(t_vicon, vicon_data[2,:],'-b')
+		line6.set_label('Vicon')
+		a3.title.set_text('Z-data')
+	a3.legend()
 	# print(len(angles))
 
 
