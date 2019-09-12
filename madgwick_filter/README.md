@@ -1,4 +1,3 @@
-# Team 7 submission
 # Instruction to run the code
 * Navigate to the code directory
 
