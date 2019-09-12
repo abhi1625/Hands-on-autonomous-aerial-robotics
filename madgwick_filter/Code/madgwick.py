@@ -132,7 +132,7 @@ def rotvec_to_euler(R):
     return np.array((phi, theta, psi))
 
 def main():
-	imu_params = scipy.io.loadmat('./IMUParams.mat')
+	imu_params = scipy.io.loadmat('../IMUParams.mat')
 	acc_scale = imu_params['IMUParams'][0]
 	acc_bias = imu_params['IMUParams'][1]
 	Parser = argparse.ArgumentParser()
