@@ -265,7 +265,7 @@ class UKF:
         # input('a')
         return Pk, xkbarhat
 
-    def RunUkf(self, acc, gyro,dt):
+    def RunUkf(self, acc, gyro,dt=0.01):
 		# Compute transformed sigma pts
 		self.dt = dt
 		X,Y = self.Gen_sigma_points()
