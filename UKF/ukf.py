@@ -3,30 +3,33 @@ import math
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 import tqdm
+import sys
 # import pyquaternion as quat
 
-class UKF:
-    def __init__(self,init_state=np.array([1,0,0,0,0,0,0])):
+np.set_printoptions(threshold = sys.maxsize)
 
-        self.dt = 0.01
+class UKF:
+    def __init__(self,init_state=np.array([1,0,0,0,0,0,0],dtype = np.float64)):
+
+        self.dt = 1/110.0
         self.state = init_state                               #initial state
         #initial covariance matrix
         self.P = np.zeros((6,6))
         np.fill_diagonal(self.P, [0.01,0.01,0.01,0.01,0.01,0.01])
         # Process Model noise
         self.Q = np.zeros((6,6))
-        np.fill_diagonal(self.Q, [100,100,100,0.1,0.1,0.1])
+        np.fill_diagonal(self.Q, [100,100,100,0.01,0.01,0.01])
         # Measurement Model noise
         self.R = np.zeros((6,6))
-        np.fill_diagonal(self.R, [0.5,0.5,0.5,0.01,0.01,0.01])
+        np.fill_diagonal(self.R, [0.5,0.5,0.5,0.05,0.05,0.05])
         self.n = 6                                            #Number of independant state variabls
         self.thld = 1e-5
-        self.MaxIter = 1000
+        self.MaxIter = 2000
         
     def quaternion_multiply(self,quaternion1, quaternion0):
 
-        w0, x0, y0, z0 = quaternion1
-        w1, x1, y1, z1 = quaternion0
+        w0, x0, y0, z0 = np.float64(quaternion1)
+        w1, x1, y1, z1 = np.float64(quaternion0)
         return np.array([-x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
                      	  x1 * w0 - y1 * z0 + z1 * y0 + w1 * x0,
                           x1 * z0 + y1 * w0 - z1 * x0 + w1 * y0,
@@ -38,7 +41,7 @@ class UKF:
 
 		alpha = math.atan2(sinalpha,cosalpha)
 		if (sinalpha==0):
-			rv = np.array([0,0,0])
+			rv = np.array([0,0,0],dtype=np.float64)
 			return rv
 
 		e = q[1:4]/float(sinalpha)
@@ -46,12 +49,12 @@ class UKF:
 		return rv
 
 
-    def qfromEuler(self,eul_angles):
+    def qfromEuler(self,eul_angles,dtt=1.0):
         norm = np.linalg.norm(eul_angles)
         # print(norm)
-        dtt = 0.01
+        dtt = dtt
         if norm==0:
-            q = np.array([1,0,0,0])
+            q = np.array([1,0,0,0],dtype=np.float64)
             return q
         alpha = norm*dtt
         ew = eul_angles*(dtt/alpha)
@@ -62,26 +65,33 @@ class UKF:
         q = q/np.linalg.norm(q)
         return q
     
-    def getX1Y1fromW(self, delta_q):
+    def get_sig_pts(self):
+		num_pts = self.W.shape[1]
+		X1 = np.zeros((4,12))
+		for pt in range(num_pts):
+		    qw = self.qfromEuler(self.W[:,pt])
+		    X1[:,pt] = self.quaternion_multiply(self.state[:-3],qw)
+		X2 = self.W[-3:] + self.state[-3:, np.newaxis]
+		sigma_pts = np.concatenate([X1,X2],axis=0)
+		return sigma_pts
+
+    def get_tfm_sig_pts(self,X):
     	#Returns quaternion part of sigma points and transformed sigma points
     	# Input = state update transformed into quaternion
     	# Output X1(sigma points) and Y1(transformed sigma points)
 		num_pts = self.W.shape[1]
-		X1 = np.zeros((4,12))
 		Y1 = np.zeros((4,12))
 		# print("q from w = ",self.state[:-3], np.linalg.norm(self.state[:-3]))
 		# input('awev')
 		for pt in range(num_pts):
-		    qw = self.qfromEuler(self.W[:,pt])
-		    # print("rv2q = ",qw)
-		    # input("qw")
-		    #process model update
-		    X1[:,pt] = self.quaternion_multiply(self.state[:-3],qw)
-		    qw = self.quaternion_multiply(qw,delta_q)
-		    Y1[:,pt] = self.quaternion_multiply(self.state[:-3],qw)
-		# print("sig pts = ", X1)
-		# input("asdr")
-		return X1,Y1
+		    
+		    omega = X[-3:,pt]
+		    delta_q = self.qfromEuler(omega,self.dt)
+		    # qw = self.quaternion_multiply(qw,delta_q)
+		    Y1[:,pt] = self.quaternion_multiply(X[:-3,pt],delta_q)
+		Y2 = X[-3:,:]
+		Tfm_sigma_pts = np.concatenate([Y1,Y2],axis=0)
+		return Tfm_sigma_pts
 
     def qinv(self,q):
         w,x,y,z = q
@@ -100,19 +110,21 @@ class UKF:
         # print(self.W)
         # input('aaaa')
         #Process model
-        omega = self.state[-3:]
+        # omega = self.state[-3:]
         # print(self.state)
-        delta_q = self.qfromEuler(omega)
+        # delta_q = self.qfromEuler(omega,self.dt)
         # print(delta_q)
         # input('aaaa')
-        X1,Y1 = self.getX1Y1fromW(delta_q)                           #Directly get updated sigma points
-        X2 = self.W[-3:] + self.state[-3:, np.newaxis]
-        # print(X2)
-        # input('a')
-        sigma_pts = np.concatenate([X1,X2],axis=0)
-        Tfm_sigma_pts = np.concatenate([Y1,X2],axis=0)
+        X = self.get_sig_pts()
+        Y = self.get_tfm_sig_pts(X)
+        # X1,Y1 = self.getX1Y1fromW()                           #Directly get updated sigma points
+        # X2 = self.W[-3:] + self.state[-3:, np.newaxis]
+        # # print(X2)
+        # # input('a')
+        # sigma_pts = np.concatenate([X1,X2],axis=0)
+        
 
-        return sigma_pts,Tfm_sigma_pts
+        return X,Y
 
     def intrinsicGradientDescent(self, sigma_pts, Tfm_sigma_pts):
         # print(sigma_pts)
@@ -123,7 +135,7 @@ class UKF:
         num_pts = Tfm_sigma_pts.shape[1]
         err_vectors =np.zeros((num_pts,3))  #12x3
         iter_ = 1
-        mean_err = np.array([10000,10000,10000])
+        mean_err = np.array([10000.,10000.,10000.])
         while(np.linalg.norm(mean_err)>self.thld and iter_<=self.MaxIter):
             for i in range(num_pts):
                 qi = Tfm_sigma_pts[:-3,i]
@@ -183,15 +195,15 @@ class UKF:
     def compute_Z(self, Y):
         num_pts = Y.shape[1]
         # Gravity vector in quaternion
-        g = np.array([0,0,0,1])
+        g = np.array([0,0,0,1],dtype=np.float64)
         Z = np.zeros((6,num_pts))
         
         for i in range(num_pts):
             quat = self.quaternion_multiply(self.qinv(Y[:-3,i]),g)
-            print("quat 1 ",quat)
+            # print("quat 1 ",quat)
             quat = self.quaternion_multiply(quat,Y[:-3,i])
-            print("quat 2 ",quat)
-            input("quat")
+            # print("quat 2 ",quat)
+            # input("quat")
             Z[:,i] = np.concatenate([self.quat2RV(quat),Y[-3:,i]],axis=0)
         # print(self.quat2RV(quat))
         # input('Z')
@@ -218,7 +230,7 @@ class UKF:
     def Compute_Inn_cov(self, Z_mean_centered):
         # Compute Innovation covariance
         num_pts = float(Z_mean_centered.shape[1])
-        Pzz = (1/(num_pts))*np.matmul(Z_mean_centered,Z_mean_centered.T)
+        Pzz = (1/num_pts)*np.matmul(Z_mean_centered,Z_mean_centered.T)
         Pvv = Pzz + self.R
         return Pvv
 
@@ -245,50 +257,54 @@ class UKF:
         return Pk, xkbarhat
 
     def RunUkf(self, acc, gyro):
-        # Compute transformed sigma pts
-        X,Y = self.Gen_sigma_points()
-        # print(Y)
-        # input('a')
-        # Get mean value of Y; xkbar = [qbar,omega_bar]
-        qbar,omega_bar = self.intrinsicGradientDescent(X[:,0],Y)
-        # print("qbar = ", qbar)
-        # print("omega_bar/// = ", omega_bar)
-        # input('aaaaa')
-        xkbar = np.concatenate((qbar,omega_bar),axis=0)
-        # print ("xkbar = ",xkbar)
-        # input('a')
-        
-        W_dash = self.get_W_dash(Y,qbar,omega_bar)
-        # print("W_dash", W_dash)
-        # input("A")
-        #  Compute process model covariance
-        Pk_bar = self.update_model_cov(W_dash)
+		# Compute transformed sigma pts
+		X,Y = self.Gen_sigma_points()
+		# print(Y)
+		# input('a')
+		# Get mean value of Y; xkbar = [qbar,omega_bar]
+		qbar,omega_bar = self.intrinsicGradientDescent(X[:,0],Y)
+		# print("qbar = ", qbar)
+		# print("omega_bar/// = ", omega_bar)
+		# input('aaaaa')
+		xkbar = np.concatenate((qbar,omega_bar),axis=0)
+		# print ("xkbar = ",xkbar)
+		# input('a')
 
-        # Apply the measurement model 
-        Z = self.compute_Z(Y)
-        print("Z = ",Z)
-        input("Z")
-        # Center Z around mean 
-        Z_centered = self.Z_mean_centered(Z)
+		W_dash = self.get_W_dash(Y,qbar,omega_bar)
+		# print("X", X)
+		# input("A")
+		#  Compute process model covariance
+		Pk_bar = self.update_model_cov(W_dash)
 
-        # Compute innovation term
-        vk = self.Compute_vk(acc, gyro, Z)
+		# Apply the measurement model 
+		Z = self.compute_Z(Y)
+		# print("X = ",X)
+		# input("X")
+		# print("Y = ",Y)
+		# input("Y")
+		# print("Z = ",Z)
+		# input("Z")
+		# Center Z around mean 
+		Z_centered = self.Z_mean_centered(Z)
 
-        # Compute innovation covariances
-        Pvv = self.Compute_Inn_cov(Z_centered)
+		# Compute innovation term
+		vk = self.Compute_vk(acc, gyro, Z)
 
-        # Compute Cross correlation matrix
-        Pxz = self.Compute_cross_corr_mat(W_dash, Z_centered)
+		# Compute innovation covariances
+		Pvv = self.Compute_Inn_cov(Z_centered)
 
-        # Update state
+		# Compute Cross correlation matrix
+		Pxz = self.Compute_cross_corr_mat(W_dash, Z_centered)
 
-        # Update covariance
-        Pk,xkbarhat = self.State_update(Pxz,Pvv,vk,xkbar,Pk_bar)
+		# Update state
 
-        self.state = xkbarhat
-        self.P = Pk
+		# Update covariance
+		Pk,xkbarhat = self.State_update(Pxz,Pvv,vk,xkbar,Pk_bar)
 
-        return xkbarhat, Pk
+		self.state = xkbarhat
+		self.P = Pk
+
+		return xkbarhat, Pk
 
 
 def process_data(acc_data,acc_scale,acc_bias,gyro):
@@ -331,16 +347,16 @@ def main():
 	ukf = UKF()
 	xkbarhat_arr = []
 	# read acc and gyro data
-	data = loadmat('../../drone_course_data/UKF/imu/imuRaw1.mat')
-	vicon_data = loadmat('../../drone_course_data/UKF/vicon/viconRot1.mat')
+	data = loadmat('../../drone_course_data/UKF/imu/imuRaw2.mat')
+	vicon_data = loadmat('../../drone_course_data/UKF/vicon/viconRot2.mat')
 	imu_params = loadmat('/home/pratique/git_cloned_random/ESE650Project2-master/Preprocess/IMUParams.mat')
 	acc_scale = imu_params['IMUParams'][0]
 	acc_bias = imu_params['IMUParams'][1]
 
 	acc_data = data['vals'][:3,:]
 	gyro_data = data['vals'][-3:,:]
-	# num_iter = acc_data.shape[1]
-	num_iter = 2000
+	num_iter = acc_data.shape[1]
+	# num_iter = 2000
 	start = 0
 	print num_iter
 	count = 0
@@ -394,59 +410,96 @@ def main():
 	# plt.plot(time, gyro_data[0,:],'r')
 	# plt.plot(time2, rots_dataX,'-k')
 	# plt.plot(time2, eul_all,'c')
-	
+
+
 	a1 = plt.subplot(4,1,1)
-	line1, = a1.plot(time,acc_data[0,:],'r')
+	line1, = a1.plot(time,acc_data[0,:],'y')
 	# line1.set_label('acc data')
 	# if vicon_data is not ' ':
-	line2, = a1.plot(time,acc_data[1,:],'g')
-	line3, = a1.plot(time,acc_data[2,:],'b')
+	line2, = a1.plot(time,gyro_data[0,:],'g')
+	line3, = a1.plot(time_rot,rots_dataX,'b')
+	line4, = a1.plot(time2,eul_all_X,'r')
 	line1.set_label('x acc')
-	line2.set_label('y acc')
-	line3.set_label('z acc')
+	line2.set_label('x gyro')
+	line3.set_label('x Vicon')
+	line4.set_label('x UKF')
 
-	a1.title.set_text('Acc data')
+	a1.title.set_text('X axis')
 	a1.legend()
 
-	
+
 	a2 = plt.subplot(4,1,2)
-	line4, = a2.plot(time,gyro_data[0,:],'r')
+	line5, = a2.plot(time,acc_data[1,:],'y')
 	# line1.set_label('acc data')
 	# if vicon_data is not ' ':
-	line5, = a2.plot(time,gyro_data[1,:],'g')
-	line6, = a2.plot(time,gyro_data[2,:],'b')
-	line4.set_label('x gyro')
-	line5.set_label('y gyro')
-	line6.set_label('z gyro')
+	line6, = a2.plot(time,gyro_data[1,:],'g')
+	line7, = a2.plot(time_rot,rots_dataY,'b')
+	line8, = a2.plot(time2,eul_all_Y,'r')
+	line5.set_label('y acc')
+	line6.set_label('y gyro')
+	line7.set_label('y Vicon')
+	line8.set_label('y UKF')
 
-	a2.title.set_text('Gryo data')
+	a2.title.set_text('Y axis')
 	a2.legend()
 
+
 	a3 = plt.subplot(4,1,3)
-	line7, = a3.plot(time_rot,rots_dataX,'r')
-	# line8.set_label('acc data')
-	# if vicon_data is not ' ':
-	line8, = a3.plot(time_rot,rots_dataY,'g')
-	line9, = a3.plot(time_rot,rots_dataZ,'b')
-	line7.set_label('x vicon')
-	line8.set_label('y vicon')
-	line9.set_label('z vicon')
-
-	a3.title.set_text('Vicon data')
-	a3.legend()
-
-	a4 = plt.subplot(4,1,4)
-	line10, = a4.plot(time2,eul_all_X,'r')
+	line9, = a3.plot(time,acc_data[2,:],'y')
 	# line1.set_label('acc data')
 	# if vicon_data is not ' ':
-	line11, = a4.plot(time2,eul_all_Y,'g')
-	line12, = a4.plot(time2,eul_all_Z,'b')
-	line10.set_label('x ukf')
-	line11.set_label('y ukf')
-	line12.set_label('z ukf')
+	line10, = a3.plot(time,gyro_data[2,:],'g')
+	line11, = a3.plot(time_rot,rots_dataZ,'b')
+	line12, = a3.plot(time2,eul_all_Z,'r')
+	line9.set_label('z acc')
+	line10.set_label('z gyro')
+	line11.set_label('z Vicon')
+	line12.set_label('z UKF')
 
-	a4.title.set_text('UKF data')
-	a4.legend()
+	a3.title.set_text('Z axis')
+	a3.legend()
+
+
+
+	
+	# a2 = plt.subplot(4,1,2)
+	# line4, = a2.plot(time,acc_data[0,:],'r')
+	# # line1.set_label('acc data')
+	# # if vicon_data is not ' ':
+	# line5, = a2.plot(time,gyro_data[1,:],'g')
+	# line6, = a2.plot(time_rot,rots_dataY,'b')
+	# line4.set_label('x gyro')
+	# line5.set_label('y gyro')
+	# line6.set_label('z gyro')
+
+	# a2.title.set_text('Gryo data')
+	# a2.legend()
+
+	# a3 = plt.subplot(4,1,3)
+	# line7, = a3.plot(time,acc_data,'r')
+	# # line8.set_label('acc data')
+	# # if vicon_data is not ' ':
+	# line8, = a3.plot(time,gyro_data,'g')
+	# line9, = a3.plot(time_rot,rots_dataZ,'b')
+	# line7.set_label('x vicon')
+	# line8.set_label('y vicon')
+	# line9.set_label('z vicon')
+
+	# a3.title.set_text('Vicon data')
+	# a3.legend()
+
+	# a4 = plt.subplot(4,1,4)
+	# line10, = a4.plot(time2,eul_all_X,'r')
+	# # line1.set_label('acc data')
+	# # if vicon_data is not ' ':
+	# line11, = a4.plot(time2,eul_all_Y,'g')
+	# line12, = a4.plot(time2,eul_all_Z,'b')
+	# line10.set_label('x ukf')
+	# line11.set_label('y ukf')
+	# line12.set_label('z ukf')
+
+	# a4.title.set_text('UKF data')
+	# a4.legend()
 	plt.show()
         
 if __name__ == '__main__':
