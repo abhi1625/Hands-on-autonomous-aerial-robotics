@@ -18,10 +18,10 @@ class UKF:
         np.fill_diagonal(self.P, [0.01,0.01,0.01,0.01,0.01,0.01])
         # Process Model noise
         self.Q = np.zeros((6,6))
-        np.fill_diagonal(self.Q, [100,100,100,0.01,0.01,0.01])
+        np.fill_diagonal(self.Q, [100,100,100,0.8,0.8,0.8])
         # Measurement Model noise
         self.R = np.zeros((6,6))
-        np.fill_diagonal(self.R, [0.5,0.5,0.5,0.05,0.05,0.05])
+        np.fill_diagonal(self.R, [0.5,0.5,0.5,0.01,0.01,0.01])
         self.n = 6                                            #Number of independant state variabls
         self.thld = 1e-5
         self.MaxIter = 2000
@@ -197,7 +197,8 @@ class UKF:
         # Gravity vector in quaternion
         g = np.array([0,0,0,1],dtype=np.float64)
         Z = np.zeros((6,num_pts))
-        
+        # print("Y = ",Y)
+        # input("a")
         for i in range(num_pts):
             quat = self.quaternion_multiply(self.qinv(Y[:-3,i]),g)
             # print("quat 1 ",quat)
@@ -223,6 +224,8 @@ class UKF:
     def Compute_vk(self, acc, gyro, Z):
         #compute the innovation term vk
         Zk = np.concatenate((acc,gyro),axis=0)
+        # print("zk = ",Zk)
+        # input("zk")
         # print("Z, zk", len(self.compute_Z_mean(Z)), Zk.shape)
         vk = Zk - self.compute_Z_mean(Z)
         # print(self.compute_Z_mean(Z))
@@ -244,14 +247,18 @@ class UKF:
     def State_update(self,Pxz,Pvv,Vk,xkbar,Pk_bar):
         #Compute Kalman Gain and update state
         Kk = np.matmul(Pxz,np.linalg.inv(Pvv))
-        # 
+        # print("kk",np.float16(Kk))
+        # input("kk")
         # xk = xkbar + np.matmul(Kk,Vk)
         Kkvk = np.matmul(Kk,Vk)
+        # print("kkvk",np.float16(Kkvk))
+        # input("kkvk")
         quat = self.quaternion_multiply(xkbar[:4],self.qfromEuler(Kkvk[:3]))
         quat = np.divide(quat,np.linalg.norm(quat))
         # print("xkbar = ",xkbar[-3:],Kkvk[-3:])
         xkbarhat = np.concatenate((quat,xkbar[-3:]+Kkvk[-3:]),axis=0)
-
+        # print("xkbarhat",np.float16(xkbarhat))
+        # input("kkvk")
         # 
         Pk = Pk_bar - np.matmul(Kk,np.matmul(Pvv,Kk.T))
         # print xkbarhat
@@ -278,7 +285,8 @@ class UKF:
 		# input("A")
 		#  Compute process model covariance
 		Pk_bar = self.update_model_cov(W_dash)
-
+		# print("Pk_bar",np.float16(Pk_bar))
+		# input("kkvk")
 		# Apply the measurement model 
 		Z = self.compute_Z(Y)
 
@@ -293,21 +301,25 @@ class UKF:
 		# print("Z_mean_centered = ",Z_centered)
 		# input("SA")
 		# Compute innovation term
+		# print("acc and gyro",acc, gyro)
+		# input("acc")
 		vk = self.Compute_vk(acc, gyro, Z)
 		# print("vk = ",vk)
 		# input("vk")
 		# Compute innovation covariances
 		Pvv = self.Compute_Inn_cov(Z_centered)
-		# print("Pvv = ",Pvv)
+		# print("Pvv = ",np.float16(Pvv))
 		# input("pvv")
 		# Compute Cross correlation matrix
 		Pxz = self.Compute_cross_corr_mat(W_dash, Z_centered)
-		# print("Pxz = ",Pxz)
+		# print("Pxz = ",np.float16(Pxz))
 		# input("pxz")
 		# Update state
 
 		# Update covariance
 		Pk,xkbarhat = self.State_update(Pxz,Pvv,vk,xkbar,Pk_bar)
+		# print("Pk",np.float16(Pk))
+		# input("kkvk")
 
 		self.state = xkbarhat
 		self.P = Pk
@@ -323,7 +335,7 @@ def process_data(acc_data,acc_scale,acc_bias,gyro):
     gyro_bias = np.mean(gyro[:,:200],axis = 1)
 
     gyro_data = gyro - gyro_bias[:,np.newaxis]
-    gyro_data = (3300/1023)*(np.pi/180)*(1/3.33)*gyro_data[[2,0,1],:]
+    gyro_data = (3300/1023)*(np.pi/180)*(1/3.33)*gyro_data[[1,2,0],:]
 
     return acc_data, gyro_data
 
@@ -355,8 +367,8 @@ def main():
 	ukf = UKF()
 	xkbarhat_arr = []
 	# read acc and gyro data
-	data = loadmat('../../drone_course_data/UKF/imu/imuRaw2.mat')
-	vicon_data = loadmat('../../drone_course_data/UKF/vicon/viconRot2.mat')
+	data = loadmat('../../drone_course_data/UKF/imu/imuRaw1.mat')
+	vicon_data = loadmat('../../drone_course_data/UKF/vicon/viconRot1.mat')
 	imu_params = loadmat('/home/pratique/git_cloned_random/ESE650Project2-master/Preprocess/IMUParams.mat')
 	acc_scale = imu_params['IMUParams'][0]
 	acc_bias = imu_params['IMUParams'][1]
@@ -390,6 +402,10 @@ def main():
 		else:
 			dt = ts[0][count]-ts[0][count-1]
 		xkbarhat,Pk = ukf.RunUkf(acc_data[:,count],gyro_data[:,count],dt)
+		# if count>1000:
+		# 	print("xkbarhat = ", xkbarhat)
+		# 	print("pk = ", Pk)
+		# 	input("asa")
 		xkbarhat_arr.append(xkbarhat)
 		eul_angles = ukf.quat2RV(xkbarhat[:4])
 		# print("euler angles = ",eul_angles)
@@ -428,9 +444,9 @@ def main():
 	a1 = plt.subplot(4,1,1)
 	line1, = a1.plot(time,acc_data[0,:],'y')
 	# line1.set_label('acc data')
-	# if vicon_data is not ' ':
 	line2, = a1.plot(time,gyro_data[0,:],'g')
-	line3, = a1.plot(time_rot,rots_dataX,'b')
+	if vicon_data is not ' ':
+		line3, = a1.plot(time_rot,rots_dataX,'b')
 	line4, = a1.plot(time2,eul_all_X,'r')
 	line1.set_label('x acc')
 	line2.set_label('x gyro')
@@ -444,9 +460,9 @@ def main():
 	a2 = plt.subplot(4,1,2)
 	line5, = a2.plot(time,acc_data[1,:],'y')
 	# line1.set_label('acc data')
-	# if vicon_data is not ' ':
 	line6, = a2.plot(time,gyro_data[1,:],'g')
-	line7, = a2.plot(time_rot,rots_dataY,'b')
+	if vicon_data is not ' ':
+		line7, = a2.plot(time_rot,rots_dataY,'b')
 	line8, = a2.plot(time2,eul_all_Y,'r')
 	line5.set_label('y acc')
 	line6.set_label('y gyro')
@@ -460,9 +476,9 @@ def main():
 	a3 = plt.subplot(4,1,3)
 	line9, = a3.plot(time,acc_data[2,:],'y')
 	# line1.set_label('acc data')
-	# if vicon_data is not ' ':
 	line10, = a3.plot(time,gyro_data[2,:],'g')
-	line11, = a3.plot(time_rot,rots_dataZ,'b')
+	if vicon_data is not ' ':
+		line11, = a3.plot(time_rot,rots_dataZ,'b')
 	line12, = a3.plot(time2,eul_all_Z,'r')
 	line9.set_label('z acc')
 	line10.set_label('z gyro')
@@ -472,47 +488,6 @@ def main():
 	a3.title.set_text('Z axis')
 	a3.legend()
 
-
-
-	
-	# a2 = plt.subplot(4,1,2)
-	# line4, = a2.plot(time,acc_data[0,:],'r')
-	# # line1.set_label('acc data')
-	# # if vicon_data is not ' ':
-	# line5, = a2.plot(time,gyro_data[1,:],'g')
-	# line6, = a2.plot(time_rot,rots_dataY,'b')
-	# line4.set_label('x gyro')
-	# line5.set_label('y gyro')
-	# line6.set_label('z gyro')
-
-	# a2.title.set_text('Gryo data')
-	# a2.legend()
-
-	# a3 = plt.subplot(4,1,3)
-	# line7, = a3.plot(time,acc_data,'r')
-	# # line8.set_label('acc data')
-	# # if vicon_data is not ' ':
-	# line8, = a3.plot(time,gyro_data,'g')
-	# line9, = a3.plot(time_rot,rots_dataZ,'b')
-	# line7.set_label('x vicon')
-	# line8.set_label('y vicon')
-	# line9.set_label('z vicon')
-
-	# a3.title.set_text('Vicon data')
-	# a3.legend()
-
-	# a4 = plt.subplot(4,1,4)
-	# line10, = a4.plot(time2,eul_all_X,'r')
-	# # line1.set_label('acc data')
-	# # if vicon_data is not ' ':
-	# line11, = a4.plot(time2,eul_all_Y,'g')
-	# line12, = a4.plot(time2,eul_all_Z,'b')
-	# line10.set_label('x ukf')
-	# line11.set_label('y ukf')
-	# line12.set_label('z ukf')
-
-	# a4.title.set_text('UKF data')
-	# a4.legend()
 	plt.show()
         
 if __name__ == '__main__':

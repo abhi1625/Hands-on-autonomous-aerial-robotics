@@ -105,7 +105,7 @@ def process_data(acc_data,acc_scale,acc_bias,gyro):
     gyro_bias = np.mean(gyro[:,:200],axis = 1)
 
     gyro_data = gyro - gyro_bias[:,np.newaxis]
-    gyro_data = (3300/1023)*(np.pi/180)*(1/3.33)*gyro_data[[2,0,1],:]
+    gyro_data = (3300/1023)*(np.pi/180)*(1/3.33)*gyro_data[[1,2,0],:]
 
     return acc_data, gyro_data
 
