@@ -145,7 +145,7 @@ def main():
 	vicon_data = Args.vicon_data
 	
 	data = scipy.io.loadmat(imu_data)
-	print data
+	# print data
 	
 	time_stamp = data['ts']
 	# print "ts_imu, ", time_stamp[0]
@@ -177,6 +177,7 @@ def main():
 	while i<=thresh:
 		acc = np.reshape(acc_all[:,i], (3,1))
 		gyro = np.reshape(gyro_all[:,i], (3,1))
+		print("acc gyro",acc,gyro)
 
 		q, acc_int, gyro_int = mk.imu_update(acc,gyro,q_est)
 
