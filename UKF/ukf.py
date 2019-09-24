@@ -11,7 +11,7 @@ np.set_printoptions(threshold = sys.maxsize)
 class UKF:
     def __init__(self,init_state=np.array([1,0,0,0,0,0,0],dtype = np.float64)):
 
-        self.dt = 1/110.0
+        self.dt = 1/100.0
         self.state = init_state                               #initial state
         #initial covariance matrix
         self.P = np.zeros((6,6))
@@ -202,7 +202,7 @@ class UKF:
             quat = self.quaternion_multiply(self.qinv(Y[:-3,i]),g)
             # print("quat 1 ",quat)
             quat = self.quaternion_multiply(quat,Y[:-3,i])
-            # print("quat 2 ",quat)
+            # print("quat ",quat)
             # input("quat")
             Z[:,i] = np.concatenate([self.quat2RV(quat),Y[-3:,i]],axis=0)
         # print(self.quat2RV(quat))
@@ -215,6 +215,8 @@ class UKF:
     def Z_mean_centered(self, Z):
         # center the Z around mean
         Z_mean = self.compute_Z_mean(Z)
+        # print("Z_mean = ",Z_mean)
+        # input("qas")
         Z_centered = Z - Z_mean[:,np.newaxis]
         return Z_centered
 
@@ -256,8 +258,9 @@ class UKF:
         # input('a')
         return Pk, xkbarhat
 
-    def RunUkf(self, acc, gyro):
+    def RunUkf(self, acc, gyro,dt):
 		# Compute transformed sigma pts
+		self.dt = dt
 		X,Y = self.Gen_sigma_points()
 		# print(Y)
 		# input('a')
@@ -278,7 +281,8 @@ class UKF:
 
 		# Apply the measurement model 
 		Z = self.compute_Z(Y)
-		# print("X = ",X)
+
+		# print("Z = ",Z)
 		# input("X")
 		# print("Y = ",Y)
 		# input("Y")
@@ -286,16 +290,20 @@ class UKF:
 		# input("Z")
 		# Center Z around mean 
 		Z_centered = self.Z_mean_centered(Z)
-
+		# print("Z_mean_centered = ",Z_centered)
+		# input("SA")
 		# Compute innovation term
 		vk = self.Compute_vk(acc, gyro, Z)
-
+		# print("vk = ",vk)
+		# input("vk")
 		# Compute innovation covariances
 		Pvv = self.Compute_Inn_cov(Z_centered)
-
+		# print("Pvv = ",Pvv)
+		# input("pvv")
 		# Compute Cross correlation matrix
 		Pxz = self.Compute_cross_corr_mat(W_dash, Z_centered)
-
+		# print("Pxz = ",Pxz)
+		# input("pxz")
 		# Update state
 
 		# Update covariance
@@ -352,6 +360,7 @@ def main():
 	imu_params = loadmat('/home/pratique/git_cloned_random/ESE650Project2-master/Preprocess/IMUParams.mat')
 	acc_scale = imu_params['IMUParams'][0]
 	acc_bias = imu_params['IMUParams'][1]
+	ts = data['ts']
 
 	acc_data = data['vals'][:3,:]
 	gyro_data = data['vals'][-3:,:]
@@ -376,7 +385,11 @@ def main():
 	# print (acc_data[:,0], gyro_data[:,0])
 	# input('a')
 	while count<num_iter:
-		xkbarhat,Pk = ukf.RunUkf(acc_data[:,count],gyro_data[:,count])
+		if count == 0:
+			dt = 0.01
+		else:
+			dt = ts[0][count]-ts[0][count-1]
+		xkbarhat,Pk = ukf.RunUkf(acc_data[:,count],gyro_data[:,count],dt)
 		xkbarhat_arr.append(xkbarhat)
 		eul_angles = ukf.quat2RV(xkbarhat[:4])
 		# print("euler angles = ",eul_angles)
