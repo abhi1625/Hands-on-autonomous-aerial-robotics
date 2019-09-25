@@ -18,13 +18,30 @@ class UKF:
         np.fill_diagonal(self.P, [0.01,0.01,0.01,0.01,0.01,0.01])
         # Process Model noise
         self.Q = np.zeros((6,6))
-        np.fill_diagonal(self.Q, [100,100,100,0.8,0.8,0.8])
+        np.fill_diagonal(self.Q, [100,100,100,0.05,0.05,0.05])
         # Measurement Model noise
         self.R = np.zeros((6,6))
         np.fill_diagonal(self.R, [0.5,0.5,0.5,0.01,0.01,0.01])
         self.n = 6                                            #Number of independant state variabls
         self.thld = 1e-5
         self.MaxIter = 2000
+
+
+    def quat_to_euler(self,q):
+        w,x,y,z = np.float64(q)
+        R11 = 1-2*(y**2 +z**2)
+        R21 = 2*(w*z + x*y)
+        R31 = 2*(-x*z+w*y)
+        R32 = 2*(y*z+w*x)
+        R33 = 2*(w**2)-1+2*(z**2)
+        if R31**2 >=1.0:
+            # print "true"
+            R31 = 0.99499
+        
+        phi = math.atan2(R32, R33 )*(180/np.pi);
+        theta = math.atan(R31/math.sqrt(1-R31**2) )*(180/np.pi);
+        psi = math.atan2(R21, R11 )*(180/np.pi);
+        return phi, theta, psi
         
     def quaternion_multiply(self,quaternion1, quaternion0):
 
@@ -367,9 +384,9 @@ def main():
 	ukf = UKF()
 	xkbarhat_arr = []
 	# read acc and gyro data
-	data = loadmat('../../drone_course_data/UKF/imu/imuRaw1.mat')
-	vicon_data = loadmat('../../drone_course_data/UKF/vicon/viconRot1.mat')
-	imu_params = loadmat('/home/pratique/git_cloned_random/ESE650Project2-master/Preprocess/IMUParams.mat')
+	data = loadmat('../drone_course_data/Data/Train/IMU/imuRaw6.mat')
+	vicon_data = loadmat('../drone_course_data/Data/Train/Vicon/viconRot6.mat')
+	imu_params = loadmat('../drone_course_data/Data/IMUParams.mat')
 	acc_scale = imu_params['IMUParams'][0]
 	acc_bias = imu_params['IMUParams'][1]
 	ts = data['ts']
@@ -407,7 +424,7 @@ def main():
 		# 	print("pk = ", Pk)
 		# 	input("asa")
 		xkbarhat_arr.append(xkbarhat)
-		eul_angles = ukf.quat2RV(xkbarhat[:4])
+		eul_angles = ukf.quat_to_euler(xkbarhat[:4])
 		# print("euler angles = ",eul_angles)
 		#  Converting Vicon data to euler angles
 		try:
@@ -421,9 +438,9 @@ def main():
 			pass
 
 		# print ("rr = ",rr)
-		eul_all_X.append(eul_angles[0]*(180/np.pi))
-		eul_all_Y.append(eul_angles[1]*(180/np.pi))
-		eul_all_Z.append(eul_angles[2]*(180/np.pi))
+		eul_all_X.append(eul_angles[0])
+		eul_all_Y.append(eul_angles[1])
+		eul_all_Z.append(eul_angles[2])
 		pbar.update(1)
 		count+=1
 	pbar.close()
