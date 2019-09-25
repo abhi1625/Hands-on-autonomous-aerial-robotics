@@ -1,9 +1,13 @@
+from pyquaternion import Quaternion
+from scipy.spatial.transform import Rotation
 import numpy as np
 import math
 from scipy.io import loadmat
 import matplotlib.pyplot as plt
 import tqdm
 import sys
+sys.path.append('/home/abhinav/Gits/drone-course/madgwick_filter/Code')
+from madgwick import madgwick
 # import pyquaternion as quat
 
 np.set_printoptions(threshold = sys.maxsize)
@@ -384,8 +388,9 @@ def main():
 	ukf = UKF()
 	xkbarhat_arr = []
 	# read acc and gyro data
-	data = loadmat('../drone_course_data/Data/Train/IMU/imuRaw6.mat')
-	vicon_data = loadmat('../drone_course_data/Data/Train/Vicon/viconRot6.mat')
+	data = loadmat('../drone_course_data/Data/Train/IMU/imuRaw1.mat')
+	vicon_data = loadmat('../drone_course_data/Data/Train/Vicon/viconRot1.mat')
+	# vicon_data = ' '
 	imu_params = loadmat('../drone_course_data/Data/IMUParams.mat')
 	acc_scale = imu_params['IMUParams'][0]
 	acc_bias = imu_params['IMUParams'][1]
@@ -399,17 +404,26 @@ def main():
 	print num_iter
 	count = 0
 	# time2 = np.arange(1,vicon_data['rots'].shape[2]+1)
-	time2 = np.arange(1,num_iter+1)
-	rots = vicon_data['rots']
+	time2 = [x+1 for x in range(num_iter)]#np.arange(1,num_iter+1)
+	if vicon_data is not " " :
+		rots = vicon_data['rots']
+	align_imu = [0]*40
+	num_vic = 1
+	align_vicon = [0]*num_vic
 	rots_dataX = []
 	rots_dataY = []
 	rots_dataZ = []
-	eul_all_X = []
-	eul_all_Y = []
-	eul_all_Z = []
+	eul_ukf_X = []
+	eul_ukf_Y = []
+	eul_ukf_Z = []
+	eul_mdw_X = []
+	eul_mdw_Y = []
+	eul_mdw_Z = []
 	time = np.arange(1,acc_data.shape[1]+1)
 	acc_data, gyro_data = process_data(acc_data,acc_scale,acc_bias,gyro_data)
-
+	q_init = Quaternion(1,0,0,0)
+	q_est = Quaternion(1,0,0,0)
+	mdw = madgwick(q = q_init)
 	pbar = tqdm.tqdm(total = num_iter)
 	# print (acc_data[:,0], gyro_data[:,0])
 	# input('a')
@@ -419,6 +433,9 @@ def main():
 		else:
 			dt = ts[0][count]-ts[0][count-1]
 		xkbarhat,Pk = ukf.RunUkf(acc_data[:,count],gyro_data[:,count],dt)
+		q,temp1, temp2 = mdw.imu_update(acc_data[:,count].reshape(3,1),gyro_data[:,count].reshape(3,1),q_est)
+		eulX, eulY, eulZ = ukf.quat_to_euler(q) 
+		q_est = Quaternion(q[0],q[1],q[2],q[3])
 		# if count>1000:
 		# 	print("xkbarhat = ", xkbarhat)
 		# 	print("pk = ", Pk)
@@ -438,9 +455,12 @@ def main():
 			pass
 
 		# print ("rr = ",rr)
-		eul_all_X.append(eul_angles[0])
-		eul_all_Y.append(eul_angles[1])
-		eul_all_Z.append(eul_angles[2])
+		eul_ukf_X.append(eul_angles[0])
+		eul_ukf_Y.append(eul_angles[1])
+		eul_ukf_Z.append(eul_angles[2])
+		eul_mdw_X.append(eulX)
+		eul_mdw_Y.append(eulY)
+		eul_mdw_Z.append(eulZ)
 		pbar.update(1)
 		count+=1
 	pbar.close()
@@ -449,25 +469,25 @@ def main():
 	# plt.plot(time2, gyro[0,start:start+num_iter],'r')
 	
 	fig=plt.figure(1)
-	time_rot = np.arange(1,len(rots_dataX)+1)
-	# print len(time_rot)
+	time_rot = [x+1 for x in range(len(rots_dataX)+num_vic)]
+	
 	# input("sad")
 	# plt.plot(time, acc_data[0,:],'b')
 	# plt.plot(time, gyro_data[0,:],'r')
 	# plt.plot(time2, rots_dataX,'-k')
 	# plt.plot(time2, eul_all,'c')
 
-
+	# print(align_vicon+time2, len(align_imu+time2), len(align_imu+eul_mdw_X), len(align_imu))
 	a1 = plt.subplot(4,1,1)
-	line1, = a1.plot(time,acc_data[0,:],'y')
+	# line1, = a1.plot(time,acc_data[0,:],'y')
 	# line1.set_label('acc data')
-	line2, = a1.plot(time,gyro_data[0,:],'g')
+	line2, = a1.plot(align_imu+time2,align_imu+eul_mdw_X,'g')
 	if vicon_data is not ' ':
-		line3, = a1.plot(time_rot,rots_dataX,'b')
-	line4, = a1.plot(time2,eul_all_X,'r')
-	line1.set_label('x acc')
-	line2.set_label('x gyro')
-	line3.set_label('x Vicon')
+		line3, = a1.plot(time_rot,align_vicon+rots_dataX,'b')
+		line3.set_label('x Vicon')
+	line4, = a1.plot(align_imu+time2,align_imu+eul_ukf_X,'r')
+	# line1.set_label('x acc')
+	line2.set_label('x madgwick')
 	line4.set_label('x UKF')
 
 	a1.title.set_text('X axis')
@@ -475,15 +495,15 @@ def main():
 
 
 	a2 = plt.subplot(4,1,2)
-	line5, = a2.plot(time,acc_data[1,:],'y')
+	# line5, = a2.plot(time,acc_data[1,:],'y')
 	# line1.set_label('acc data')
-	line6, = a2.plot(time,gyro_data[1,:],'g')
+	line6, = a2.plot(align_imu+time2,align_imu+eul_mdw_Y,'g')
 	if vicon_data is not ' ':
-		line7, = a2.plot(time_rot,rots_dataY,'b')
-	line8, = a2.plot(time2,eul_all_Y,'r')
-	line5.set_label('y acc')
-	line6.set_label('y gyro')
-	line7.set_label('y Vicon')
+		line7, = a2.plot(time_rot,align_vicon+rots_dataY,'b')
+		line7.set_label('y Vicon')
+	line8, = a2.plot(align_imu+time2,align_imu+eul_ukf_Y,'r')
+	# line5.set_label('y acc')
+	line6.set_label('y madgwick')
 	line8.set_label('y UKF')
 
 	a2.title.set_text('Y axis')
@@ -491,15 +511,15 @@ def main():
 
 
 	a3 = plt.subplot(4,1,3)
-	line9, = a3.plot(time,acc_data[2,:],'y')
+	# line9, = a3.plot(time,acc_data[2,:],'y')
 	# line1.set_label('acc data')
-	line10, = a3.plot(time,gyro_data[2,:],'g')
+	line10, = a3.plot(align_imu+time2,align_imu+eul_mdw_Z,'g')
 	if vicon_data is not ' ':
-		line11, = a3.plot(time_rot,rots_dataZ,'b')
-	line12, = a3.plot(time2,eul_all_Z,'r')
-	line9.set_label('z acc')
-	line10.set_label('z gyro')
-	line11.set_label('z Vicon')
+		line11, = a3.plot(time_rot,align_vicon+rots_dataZ,'b')
+		line11.set_label('z Vicon')
+	line12, = a3.plot(align_imu+time2,align_imu+eul_ukf_Z,'r')
+	# line9.set_label('z acc')
+	line10.set_label('z madgwick')
 	line12.set_label('z UKF')
 
 	a3.title.set_text('Z axis')

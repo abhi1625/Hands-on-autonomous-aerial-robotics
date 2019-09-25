@@ -16,21 +16,20 @@ import argparse
 
 
 def quat_to_euler(q):
-    w,x,y,z = q
-    R11 = 1-2*(y**2 +z**2)
-    R21 = 2*(w*z + x*y)
-    R31 = 2*(x*z+w*y)
-    R32 = 2*(y*z-w*x)
-    R33 = 2*(w**2)-1+2*(z**2)
-    if R31**2 >=1.0:
-    	# print "true"
-    	R31 = 0.99499
-    
-    phi = math.atan2(R32, R33 )*(180/np.pi);
-    theta = -math.atan(R31/math.sqrt(1-R31**2) )*(180/np.pi);
-    psi = math.atan2(R21, R11 )*(180/np.pi);
-    return phi, theta, psi
+	w,x,y,z = np.float64(q)
+	R11 = 1-2*(y**2 +z**2)
+	R21 = 2*(w*z + x*y)
+	R31 = 2*(-x*z+w*y)
+	R32 = 2*(y*z+w*x)
+	R33 = 2*(w**2)-1+2*(z**2)
+	if R31**2 >=1.0:
+		# print "true"
+		R31 = 0.99499
 
+	phi = math.atan2(R32, R33 )*(180/np.pi);
+	theta = math.atan(R31/math.sqrt(1-R31**2) )*(180/np.pi);
+	psi = math.atan2(R21, R11 )*(180/np.pi);
+	return phi, theta, psi
 
 def quaternConj(q):
     w,x,y,z = q
