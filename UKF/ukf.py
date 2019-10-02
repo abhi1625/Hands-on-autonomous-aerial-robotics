@@ -6,7 +6,7 @@ from scipy.io import loadmat
 import matplotlib.pyplot as plt
 import tqdm
 import sys
-sys.path.append('/home/abhinav/Gits/drone-course/madgwick_filter/Code')
+sys.path.append('/home/pratique/drone-course/madgwick_filter/Code')
 from madgwick import madgwick
 # import pyquaternion as quat
 
@@ -22,7 +22,7 @@ class UKF:
         np.fill_diagonal(self.P, [0.01,0.01,0.01,0.01,0.01,0.01])
         # Process Model noise
         self.Q = np.zeros((6,6))
-        np.fill_diagonal(self.Q, [100,100,100,0.05,0.05,0.05])
+        np.fill_diagonal(self.Q, [100,100,100,0.1,0.1,0.1])
         # Measurement Model noise
         self.R = np.zeros((6,6))
         np.fill_diagonal(self.R, [0.5,0.5,0.5,0.01,0.01,0.01])
@@ -388,10 +388,10 @@ def main():
 	ukf = UKF()
 	xkbarhat_arr = []
 	# read acc and gyro data
-	data = loadmat('../drone_course_data/Data/Train/IMU/imuRaw1.mat')
-	vicon_data = loadmat('../drone_course_data/Data/Train/Vicon/viconRot1.mat')
+	data = loadmat('/home/pratique/drone-course/drone_course_data/Data/Train/IMU/imuRaw1.mat')
+	vicon_data = loadmat('/home/pratique/drone-course/drone_course_data/Data/Train/Vicon/viconRot1.mat')
 	# vicon_data = ' '
-	imu_params = loadmat('../drone_course_data/Data/IMUParams.mat')
+	imu_params = loadmat('/home/pratique/drone-course/drone_course_data/Data/IMUParams.mat')
 	acc_scale = imu_params['IMUParams'][0]
 	acc_bias = imu_params['IMUParams'][1]
 	ts = data['ts']
@@ -407,7 +407,7 @@ def main():
 	time2 = [x+1 for x in range(num_iter)]#np.arange(1,num_iter+1)
 	if vicon_data is not " " :
 		rots = vicon_data['rots']
-	align_imu = [0]*40
+	align_imu = [0]*35
 	num_vic = 1
 	align_vicon = [0]*num_vic
 	rots_dataX = []
