@@ -11,7 +11,7 @@ Bebop wifi ssid: Bebop2-420368
   ```
 
 You should be able to login into the shell
-## Sending COmmands to Bebop
+## Sending Commands to Bebop
 1. Connect to Bebop 2 Wifi
 
 2. `roscore`
