@@ -41,6 +41,9 @@ Change values of x,y,z as needed.
 ```
 ~/bebop_ws/./video_stabil.sh
 ```
+## Hacking Bebop's internal PID
+ The .cfg file which contains all the gains for different modes in Bebop are present in `/etc/colibry/common/controller.cfg`.
+- Tune the gains under `ctrlGainPosition`
 
 ## Useful links
 * [Leapord camera drivers](https://github.com/chahatdeep/ubuntu-for-robotics/tree/master/Drivers)
