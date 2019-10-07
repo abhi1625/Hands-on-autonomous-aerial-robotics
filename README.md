@@ -11,6 +11,17 @@ Bebop wifi ssid: Bebop2-420368
   ```
 
 You should be able to login into the shell
+## Hacking Bebop's internal PID
+Before you begin to tune the PID, remount the disk with read and write permissions using:
+```
+mount -o remount, rw /
+```
+Now you can change parameters in any of the Bebop's internal file.
+
+The .cfg file which contains all the gains for different modes in Bebop are present in `/etc/colibry/common/controller.cfg`.
+- Tune the gains under `ctrlGainPosition`
+
+
 ## Sending Commands to Bebop
 1. Connect to Bebop 2 Wifi
 
@@ -41,9 +52,6 @@ Change values of x,y,z as needed.
 ```
 ~/bebop_ws/./video_stabil.sh
 ```
-## Hacking Bebop's internal PID
- The .cfg file which contains all the gains for different modes in Bebop are present in `/etc/colibry/common/controller.cfg`.
-- Tune the gains under `ctrlGainPosition`
 
 ## Useful links
 * [Leapord camera drivers](https://github.com/chahatdeep/ubuntu-for-robotics/tree/master/Drivers)
