@@ -56,6 +56,7 @@ Change values of x,y,z as needed.
 ## Useful links
 * [Leapord camera drivers](https://github.com/chahatdeep/ubuntu-for-robotics/tree/master/Drivers)
 * [Bebop Hacking Guide](http://fargesportfolio.com/wp-content/uploads/2018/01/BeebopHackingGuide1_7_2.pdf)
+* [Bebop_autonomy documentation](https://buildmedia.readthedocs.org/media/pdf/bebop-autonomy/latest/bebop-autonomy.pdf)
 * [bebop ros package](https://bebop-autonomy.readthedocs.io/en/latest/installation.html)
-* [Wifi driver](https://github.com/chahatdeep/rtl8812au-wifi-driver
-)
+* [Wifi driver](https://github.com/chahatdeep/rtl8812au-wifi-driver)
+
