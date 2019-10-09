@@ -26,7 +26,7 @@ def circle_traj():
 	pub = rospy.Publisher('/bebop/cmd_vel', Twist, queue_size=10)
 	
 	velocity_msg = Twist()
-	r = rospy.Rate(10)
+	r = rospy.Rate(0.1)
 
 	x_prev = 0
 	y_prev = -radius
@@ -36,7 +36,7 @@ def circle_traj():
 	y=0
 	z=0
 	count =1 
-	
+	time_begin = rospy.Time.now()
 	while ((not rospy.is_shutdown()) and (angle<=NumTurns*2*pi)):
 		angle = 2*pi*t/T
 
@@ -60,7 +60,8 @@ def circle_traj():
 		z_prev = z
 		t+=dt
 		r.sleep()
-
+	time_end = rospy.Time.now()
+	print("total time  = ",time_end.secs - time_begin.secs )
 	print('end')
 
 
