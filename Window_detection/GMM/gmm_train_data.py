@@ -31,37 +31,38 @@ def getData(folder_name):
     return np.array(stack)
 
 
+def gaussian(x, mean, cov,n_obs):
+    
+    det_cov = np.linalg.det(cov)
+    cov_inv = np.zeros_like(cov)
+    for i in range(n_obs):
+        cov_inv[i, i] = 1/cov[i, i]
+    #cov_inv = np.linalg.inv(cov)
+    diff = np.matrix(x-mean)
+    
+    N = (2.0 * np.pi) ** (-len(data[1]) / 2.0) * (1.0 / (np.linalg.det(cov) ** 0.5)) *\
+        np.exp(-0.5 * np.sum(np.multiply(diff*cov_inv, diff), axis=1))
+    return N
+
+
+def initialize(n_feat):
+    mean = np.array([data[np.random.choice(n_feat, 1)]], np.float64)
+    cov = [np.random.randint(1, 255)*np.eye(n_obs)]
+    #print(cov)
+    cov = np.matrix(np.multiply(cov,np.random.rand(n_obs, n_obs)))
+    #print(cov)
+    return {'mean': mean, 'cov': cov}
+
 def GMM(data, K):
     
     n_feat = data.shape[0] 
     n_obs = data.shape[1]
 
-    def gaussian(x, mean, cov):
-        
-        det_cov = np.linalg.det(cov)
-        cov_inv = np.zeros_like(cov)
-        for i in range(n_obs):
-            cov_inv[i, i] = 1/cov[i, i]
-        #cov_inv = np.linalg.inv(cov)
-        diff = np.matrix(x-mean)
-        
-        N = (2.0 * np.pi) ** (-len(data[1]) / 2.0) * (1.0 / (np.linalg.det(cov) ** 0.5)) *\
-            np.exp(-0.5 * np.sum(np.multiply(diff*cov_inv, diff), axis=1))
-        return N
-
-    
-    def initialize():
-        mean = np.array([data[np.random.choice(n_feat, 1)]], np.float64)
-        cov = [np.random.randint(1, 255)*np.eye(n_obs)]
-        #print(cov)
-        cov = np.matrix(np.multiply(cov,np.random.rand(n_obs, n_obs)))
-        #print(cov)
-        return {'mean': mean, 'cov': cov}
 
     bound = 0.0001
     max_itr = 500
     
-    parameters = [initialize() for cluster in range (K)]
+    parameters = [initialize(n_feat) for cluster in range (K)]
     cluster_prob = np.ndarray([n_feat, K], np.float64)
     
     #EM - step E
@@ -73,7 +74,7 @@ def GMM(data, K):
         itr+=1
 
         for cluster in range (K):
-            cluster_prob[:, cluster:cluster+1] = gaussian(data, parameters[cluster]['mean'], parameters[cluster]['cov'])*mix_c[cluster]
+            cluster_prob[:, cluster:cluster+1] = gaussian(data, parameters[cluster]['mean'], parameters[cluster]['cov'],n_obs)*mix_c[cluster]
 
         cluster_sum = np.sum(cluster_prob, axis=1)
         log_likelihood = np.sum(np.log(cluster_sum))
