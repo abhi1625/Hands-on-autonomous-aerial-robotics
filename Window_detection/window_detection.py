@@ -16,6 +16,8 @@ class Window_detection:
 	def __init__(self):
 		# self.data_path = '/home/prgumd/Desktop/pink_window.mp4'
 		self.data_path = '../../drone_course_data/window_detection/pink_window.mp4'
+		self.image_path = './GMM/test_image.jpg'
+		self.original_image = '../drone_course_data/Window_detection/GMM/data/GMM_1/frame0010.jpg'
 
 	def rotate_img_90_deg(self,img):
 		h,w = img.shape[:2]
@@ -142,11 +144,25 @@ class Window_detection:
 				cv2.destroyAllWindows()
 			count += 1
 
+	def Detection_using_threshold_image(self):
+		img = cv2.imread(self.original_image)
+		mask = cv2.imread(self.image_path,0)
+		mask = cv2.inRange(mask, 200, 255)
+		masked_img = cv2.bitwise_and(img, img, mask = mask)
+		# cv2.imshow("test",masked_img)
+		corner_pts = self.get_all_corners(masked_img, img)
+		imgPoints = self.get_outer_window_corner_points(corner_pts, img)
+		print ("imgPoints = ",imgPoints)
+		rotVec,transVec = self.pnp(imgPoints,img)
+				
+		cv2.waitKey(0)
+
+
 
 
 def main():
 	ob = Window_detection()
-	ob.Detection_using_threshold()
+	ob.Detection_using_threshold_image()
 
 if __name__ == '__main__':
 	main()

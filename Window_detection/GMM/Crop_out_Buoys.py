@@ -15,7 +15,7 @@ def catch(pt):
     p = np.array(p)
 
     mask = np.zeros_like(img1)
-    cv2.drawContours(mask, [p], -1, [255, 255, 255], -1)
+    cv2.drawContours(mask,  [p], -1, [255, 255, 255], -1)
     mask = cv2.bitwise_not(mask)
     final = cv2.add(img1, mask)
     cv2.imshow('new', img1)
