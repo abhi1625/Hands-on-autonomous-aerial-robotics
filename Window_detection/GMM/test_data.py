@@ -112,10 +112,11 @@ def test_combined(test_image,K,n_factor,weights, parameters,color):
 	return probabilities	
 			
 def preprocess_img(test_image):
-	convert = tune_RGB(test_image)
-	convert = tune_HSV(convert)
-	convert = adjust_gamma(convert, gamma = 1.0)
-	convert = cv2.fastNlMeansDenoisingColored(convert, None, 3, 3, 7, 15)
+	# convert = tune_RGB(test_image)
+	# convert = tune_HSV(convert)
+	convert = adjust_gamma(test_image, gamma = 1.5)
+	convert = cv2.medianBlur(convert, 5)
+	# convert = cv2.fastNlMeansDenoisingColored(convert, None, 3, 3, 7, 15)
 	test_image = cv2.cvtColor(convert, cv2.COLOR_BGR2RGB)
 	return test_image
 
