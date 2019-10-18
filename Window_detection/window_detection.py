@@ -42,6 +42,8 @@ class Window_detection:
 		self.data_path = '../../drone_course_data/window_detection/pink_window.mp4'
 		self.image_path = './GMM/test_image.jpg'
 		self.original_image = '../drone_course_data/Window_detection/GMM/data/GMM_1/frame0200.jpg'
+		self.image_pub = rospy.Publisher("/gmm_img", Image, queue_size=2)
+		self.bridge = CvBridge()
 
 	def rotate_img_90_deg(self,img):
 		h,w = img.shape[:2]
@@ -188,11 +190,13 @@ class Window_detection:
 		lines = cv2.HoughLinesP(closing, 1, np.pi/180, 100, minLength, maxLineGap)
 		# print lines.shape
 		# input('as')
-		for x1, y1, x2, y2 in lines[:,0,:]:
-			cv2.line(img, (x1, y1),(x2,y2), (0,255,0), 2)
+		#for x1, y1, x2, y2 in lines[:,0,:]:
+		#	cv2.line(img, (x1, y1),(x2,y2), (0,255,0), 2)
 		# print ("imgPoints = ",imgPoints)
-		cv2.imshow("image", img)				
-		cv2.waitKey(0)
+		cv_image = self.bridge.cv2_to_imgmsg(masked_img, "mono8")
+		self.image_pub.publish(cv_image)
+		#cv2.imshow("image", img)				
+		#cv2.waitKey(0)
 
 	def Detection_using_threshold_image(self, mask):
 		# img = cv2.imread(self.original_image)
