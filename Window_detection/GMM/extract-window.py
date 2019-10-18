@@ -84,13 +84,14 @@ def main():
             i+=1
             continue
         img = cv2.imread(os.path.join(data_path,filename))
-        convert = tune_RGB(img)
+        # convert = tune_RGB(img)
     	convert = tune_HSV(convert)
     	convert = adjust_gamma(convert, gamma = 1.5)
-    	convert = cv2.fastNlMeansDenoisingColored(convert, None, 3, 3, 7, 15)
-        img = cv2.cvtColor(convert,cv2.COLOR_BGR2RGB)
+    	# convert = cv2.fastNlMeansDenoisingColored(convert, None, 3, 3, 7, 15)
+        # img = cv2.cvtColor(convert,cv2.COLOR_BGR2RGB)
         # Show the image
         # Show the image
+        # img = img[:,:,[2,1,0]]
         fig = plt.figure()
         plt.imshow(img, interpolation='nearest', cmap="Greys")
         plt.colorbar()
