@@ -12,10 +12,12 @@ def save_models(weights, weights_name, parameters, params_name):
 
 def getData(folder_name):
     stack = []
-    for filename in os.listdir(folder_name):
+    for filename in sorted(os.listdir(folder_name)):
         
         image = cv2.imread(os.path.join(folder_name, filename))
+        image = image[:,:,[2,1,0]]
         # resized = cv2.resize(image, (40, 40), interpolation=cv2.INTER_LINEAR)
+        #data to be stored as RGB
 
         # image = resized[13:27, 13:27]
 
@@ -116,8 +118,8 @@ def plot_data_hist(data, name):
     plt.title("Histogram with 'auto' bins for "+name+ " channel")
     plt.show()  
 
-# train_data = getData("./data/")
-train_data = np.load("yellow_window_data.npy")
+train_data = getData("./data/")
+# train_data = np.load("yellow_window_data.npy")
 print(train_data.shape)
 input('a')
 plot_data_hist(train_data[:,0], "blue")
