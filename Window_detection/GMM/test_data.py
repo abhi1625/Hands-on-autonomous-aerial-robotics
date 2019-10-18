@@ -121,8 +121,8 @@ def preprocess_img(test_image):
 	return test_image
 
 def loadparamsGMM(weights_path, params_path):
-	weights = np.load('./training_params/window_weights.npy', allow_pickle=True)
-	parameters = np.load('./training_params/gaussian_params.npy', allow_pickle=True)
+	weights = np.load(weights_path, allow_pickle=True)
+	parameters = np.load(params_path, allow_pickle=True)
 	K = 2
 	n = 0.1
 	return n, K, weights, parameters

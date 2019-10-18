@@ -12,15 +12,15 @@ import cv2
 import numpy as np
 import math
 import copy
-import GMM.test_data
+from GMM.test_data import *
 
 class video_stream:
 	def __init__(self):
 		self.bridge = CvBridge()
 		self.image_sub = rospy.Subscriber("/image_raw", Image, self.img_callback)
 		self.window_detection = Window_detection()
-		weights_path = './training_params/window_weights.npy'
-		params_path = './training_params/gaussian_params.npy'
+		weights_path = './GMM/training_params/window_weights.npy'
+		params_path = './GMM/training_params/gaussian_params.npy'
 		self.n, self.K, self.weights, self.params = loadparamsGMM(weights_path, params_path)
 
 	def img_callback(self, data):
@@ -34,7 +34,7 @@ class video_stream:
 
 			#run GMM inference to generate mask
 			mask = test_combined(processed_img,self.K,self.n,self.weights, self.params,(0,255,0))
-			self.window_detection.detection_hough_lines(mask)
+			self.window_detection.detection_hough_lines(processed_img,mask)
 	
 class Window_detection:
 	def __init__(self):
@@ -170,7 +170,7 @@ class Window_detection:
 				cv2.destroyAllWindows()
 			count += 1
 
-	def detection_hough_lines(self, mask):
+	def detection_hough_lines(self,img, mask):
 		# img = cv2.imread(self.original_image)
 		# mask = cv2.imread(self.image_path,0)
 		mask = cv2.inRange(mask, 200, 255)
@@ -193,7 +193,7 @@ class Window_detection:
 		#for x1, y1, x2, y2 in lines[:,0,:]:
 		#	cv2.line(img, (x1, y1),(x2,y2), (0,255,0), 2)
 		# print ("imgPoints = ",imgPoints)
-		cv_image = self.bridge.cv2_to_imgmsg(masked_img, "mono8")
+		cv_image = self.bridge.cv2_to_imgmsg(masked_img, "bgr8")
 		self.image_pub.publish(cv_image)
 		#cv2.imshow("image", img)				
 		#cv2.waitKey(0)
@@ -218,8 +218,8 @@ def main():
 	count = 0
 	ob = video_stream()
 
-	rospy.init_node('image_reader', anonymus=True)
-	while(count != 1000 || not rospy.is_shutdown()):
+	rospy.init_node('image_reader', anonymous=True)
+	while(not rospy.is_shutdown()):
 		rospy.spin()
 		count += 1;
 
