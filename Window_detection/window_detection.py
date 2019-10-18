@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+import rospy
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge, CvBridgeError
 try:
 	sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages/')
 	sys.path.remove('/opt/ros/kinetic/share/opencv3/')
@@ -9,15 +12,36 @@ import cv2
 import numpy as np
 import math
 import copy
+import GMM.test_data
 
+class video_stream:
+	def __init__(self):
+		self.bridge = CvBridge()
+		self.image_sub = rospy.Subscriber("/image_raw", Image, self.img_callback)
+		self.window_detection = Window_detection()
+		weights_path = './training_params/window_weights.npy'
+		params_path = './training_params/gaussian_params.npy'
+		self.n, self.K, self.weights, self.params = loadparamsGMM(weights_path, params_path)
 
+	def img_callback(self, data):
+		try:
+			cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+		except CvBridgeError as e:
+			print(e)
+		
+		if cv_image is not None:
+			processed_img = preprocess_img(cv_image)
 
+			#run GMM inference to generate mask
+			mask = test_combined(processed_img,self.K,self.n,self.weights, self.params,(0,255,0))
+			self.window_detection.detection_hough_lines(mask)
+	
 class Window_detection:
 	def __init__(self):
 		# self.data_path = '/home/prgumd/Desktop/pink_window.mp4'
 		self.data_path = '../../drone_course_data/window_detection/pink_window.mp4'
 		self.image_path = './GMM/test_image.jpg'
-		self.original_image = '../drone_course_data/Window_detection/GMM/data/GMM_1/frame0010.jpg'
+		self.original_image = '../drone_course_data/Window_detection/GMM/data/GMM_1/frame0200.jpg'
 
 	def rotate_img_90_deg(self,img):
 		h,w = img.shape[:2]
@@ -144,12 +168,38 @@ class Window_detection:
 				cv2.destroyAllWindows()
 			count += 1
 
-	def Detection_using_threshold_image(self):
-		img = cv2.imread(self.original_image)
-		mask = cv2.imread(self.image_path,0)
+	def detection_hough_lines(self, mask):
+		# img = cv2.imread(self.original_image)
+		# mask = cv2.imread(self.image_path,0)
 		mask = cv2.inRange(mask, 200, 255)
 		masked_img = cv2.bitwise_and(img, img, mask = mask)
-		# cv2.imshow("test",masked_img)
+
+		gray = cv2.cvtColor(masked_img,cv2.COLOR_BGR2GRAY)
+		gray = cv2.medianBlur(gray,5)
+		edges = gray
+		kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(31,31))
+		# closing to fill unwanted small gaps
+		closing = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+		
+		closing = cv2.GaussianBlur(closing, (7,7), cv2.BORDER_DEFAULT)
+		edges = cv2.Canny(closing, 50, 150, apertureSize = 3)
+		minLength = 100
+		maxLineGap = 40
+		lines = cv2.HoughLinesP(closing, 1, np.pi/180, 100, minLength, maxLineGap)
+		# print lines.shape
+		# input('as')
+		for x1, y1, x2, y2 in lines[:,0,:]:
+			cv2.line(img, (x1, y1),(x2,y2), (0,255,0), 2)
+		# print ("imgPoints = ",imgPoints)
+		cv2.imshow("image", img)				
+		cv2.waitKey(0)
+
+	def Detection_using_threshold_image(self, mask):
+		# img = cv2.imread(self.original_image)
+		# mask = cv2.imread(self.image_path,0)
+		mask = cv2.inRange(mask, 200, 255)
+		masked_img = cv2.bitwise_and(img, img, mask = mask)
+		print(masked_img.shape)
 		corner_pts = self.get_all_corners(masked_img, img)
 		imgPoints = self.get_outer_window_corner_points(corner_pts, img)
 		print ("imgPoints = ",imgPoints)
@@ -161,8 +211,13 @@ class Window_detection:
 
 
 def main():
-	ob = Window_detection()
-	ob.Detection_using_threshold_image()
+	count = 0
+	ob = video_stream()
+
+	rospy.init_node('image_reader', anonymus=True)
+	while(count != 1000 || not rospy.is_shutdown()):
+		rospy.spin()
+		count += 1;
 
 if __name__ == '__main__':
 	main()

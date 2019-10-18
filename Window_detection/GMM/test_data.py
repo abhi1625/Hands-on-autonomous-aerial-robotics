@@ -5,8 +5,6 @@ import sys
 import matplotlib.pyplot as plt
 import math
 import os
-# import imutils
-# from imutils import contours
 
 def tune_HSV(img):
 	img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -108,50 +106,42 @@ def test_combined(test_image,K,n_factor,weights, parameters,color):
 	test = np.uint8(probabilities*255/np.max(probabilities))
 	
 	probabilities[probabilities>np.mean(probabilities)/n_factor] = 255
-	plt.imshow(probabilities)
-	plt.show()
-	
-	# output = np.zeros_like(frame)
-	# # print output.shape
-	
-	# output[:,:,0] = probabilities
-	# output[:,:,1] = probabilities
-	# output[:,:,2] = probabilities
-	
-	# blur = cv2.GaussianBlur(output,(3,3),5)
-	# print blur
-	# cv2.imshow("out",output)
-	# input('a')
-	# edged = cv2.Canny(blur,50,255 )
-	
-	# cnts,h = cv2.findContours(edged, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-	
-	# (cnts_sorted, boundingBoxes) = contours.sort_contours(cnts, method="left-to-right")
-	
-	# hull = cv2.convexHull(cnts_sorted[0])
-	# (x,y),radius = cv2.minEnclosingCircle(hull)
-	
-	# if radius > 7:
-	# 	cv2.circle(test_image,(int(x),int(y)-1),int(radius+1),(color),4)
+	# plt.imshow(probabilities)
+	# plt.show()
+
 	return probabilities	
 			
-	
-if __name__ == "__main__":
-	K = 2
-	n = 0.1
-	test_image_path  = '/home/abhinav/Gits/drone-course/drone_course_data/Window_detection/GMM/data/GMM_1/frame0010.jpg'
-	test_image = cv2.imread(test_image_path)
+def preprocess_img(test_image):
 	convert = tune_RGB(test_image)
 	convert = tune_HSV(convert)
 	convert = adjust_gamma(convert, gamma = 1.0)
 	convert = cv2.fastNlMeansDenoisingColored(convert, None, 3, 3, 7, 15)
 	test_image = cv2.cvtColor(convert, cv2.COLOR_BGR2RGB)
+	return test_image
 
+def loadparamsGMM(weights_path, params_path):
 	weights = np.load('./training_params/window_weights.npy', allow_pickle=True)
 	parameters = np.load('./training_params/gaussian_params.npy', allow_pickle=True)
-	print test_image.shape
-	save_img = test_combined(test_image, K,n,weights, parameters,(0,165,255))
-	cv2.imwrite("test_image.jpg", save_img)
+	K = 2
+	n = 0.1
+	return n, K, weights, parameters
+
+# if __name__ == "__main__":
+# 	weights = np.load('./training_params/window_weights.npy', allow_pickle=True)
+# 	parameters = np.load('./training_params/gaussian_params.npy', allow_pickle=True)
+# 	K = 2
+# 	n = 0.1
+
+# 	test_image_path  = '/home/abhinav/Gits/drone-course/drone_course_data/Window_detection/GMM/data/GMM_1/frame0200.jpg'
+# 	test_image = cv2.imread(test_image_path)
+# 	test_image = preprocess_img(test_image)
+
+# 	save_img = test_combined(test_image, K,n,weights, parameters,(0,165,255))
+# 	print(save_img.shape)
+# 	cv2.imshow("test", save_img)
+# 	cv2.waitKey(0)
+	# cv2.imwrite("test_image.jpg", save_img)
+
 # if __name__ == "__main__":
 # 	name = "detectbuoy.avi"
 # 	video = []
