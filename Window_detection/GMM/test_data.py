@@ -105,7 +105,8 @@ def test_combined(test_image,K,n_factor,weights, parameters,color):
 	probabilities = np.reshape(likelihood,(nx,ny))
 	test = np.uint8(probabilities*255/np.max(probabilities))
 	
-	probabilities[probabilities>np.mean(probabilities)/n_factor] = 255
+	# probabilities[probabilities > np.max(probabilities)/80] = 0
+	probabilities[(probabilities > np.mean(probabilities)/n_factor)] = 255
 	# plt.imshow(probabilities)
 	# plt.show()
 
@@ -115,15 +116,15 @@ def preprocess_img(test_image):
 	# convert = tune_RGB(test_image)
 	# convert = tune_HSV(convert)
 	convert = adjust_gamma(test_image, gamma = 1.5)
-	convert = cv2.medianBlur(convert, 5)
+	test_image = cv2.medianBlur(convert, 5)
 	# convert = cv2.fastNlMeansDenoisingColored(convert, None, 3, 3, 7, 15)
-	test_image = cv2.cvtColor(convert, cv2.COLOR_BGR2RGB)
+	test_image = cv2.cvtColor(test_image, cv2.COLOR_BGR2RGB)
 	return test_image
 
 def loadparamsGMM(weights_path, params_path):
 	weights = np.load(weights_path, allow_pickle=True)
 	parameters = np.load(params_path, allow_pickle=True)
-	K = 2
+	K = 4
 	n = 0.1
 	return n, K, weights, parameters
 

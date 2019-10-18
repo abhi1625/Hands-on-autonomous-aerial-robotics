@@ -15,19 +15,21 @@ def getData(folder_name):
     for filename in sorted(os.listdir(folder_name)):
         
         image = cv2.imread(os.path.join(folder_name, filename))
-        image = image[:,:,[2,1,0]]
+        thresh = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         # resized = cv2.resize(image, (40, 40), interpolation=cv2.INTER_LINEAR)
         #data to be stored as RGB
 
         # image = resized[13:27, 13:27]
+        image = image[:,:,[2,1,0]]
 
         ch = image.shape[2]
         nx = image.shape[0]
         ny = image.shape[1]
         image = np.reshape(image, (nx*ny, ch))
+        thresh = np.reshape(thresh,(nx*ny,1))
         #print(image.shape)
         for i in range(image.shape[0]):
-            if (image[i,:][0] == 0 and image[i,:][1] == 0 and image[i,:][2] == 0):
+            if ((thresh[i,:]<100) or (thresh[i,:]>225)):
                 # print "zero h"
                 continue
             stack.append(image[i, :])
@@ -35,7 +37,7 @@ def getData(folder_name):
         print("frame processed")
         print("length of data stack: ", len(stack))
     
-    np.save('yellow_window_data.npy',stack)
+    np.save('yellow_window_data_2.npy',stack)
     return np.array(stack)
 
 class GMM:
@@ -118,27 +120,20 @@ def plot_data_hist(data, name):
     plt.title("Histogram with 'auto' bins for "+name+ " channel")
     plt.show()  
 
-train_data = getData("./data/")
-# train_data = np.load("yellow_window_data.npy")
-print(train_data.shape)
-input('a')
-plot_data_hist(train_data[:,0], "blue")
-plot_data_hist(train_data[:,1], "red")
-plot_data_hist(train_data[:,2], "green")
+# train_data = getData("./data/")
+train_data = np.load("yellow_window_data_2.npy")
+# print(train_data_1.shape)
+# train_data2 = np.load("yellow_window_data_25.npy")
+# train_data = np.concatenate([train_data_1,train_data2],axis=0)
+# print(train_data.shape)
+
+plot_data_hist(train_data[:,0], "red")
+plot_data_hist(train_data[:,1], "green")
+plot_data_hist(train_data[:,2], "blue")
+# input('a')
 
 gmm = GMM(train_data)
-mix_c, parameters = gmm.GMM(2)
+mix_c, parameters = gmm.GMM(4)
 print mix_c, parameters
-save_models(mix_c, './training_params/window_weights', parameters, './training_params/gaussian_params')
-
-# train_data = getData("data/yellow_train")
-# mix_c, parameters = GMM(train_data, 7)
-# save_models(mix_c, 'yellow_weights', parameters, 'params_yellow')
-
-# train_data = getData("data/green_train")
-# mix_c, parameters = GMM(train_data, 4)
-# save_models(mix_c, 'green_weights', parameters, 'params_green')
-
-
-
+save_models(mix_c, './training_params/window_weights_4', parameters, './training_params/gaussian_params_4')
 
