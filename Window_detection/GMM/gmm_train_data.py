@@ -120,20 +120,20 @@ def plot_data_hist(data, name):
     plt.title("Histogram with 'auto' bins for "+name+ " channel")
     plt.show()  
 
-# train_data = getData("./data/")
-train_data = np.load("yellow_window_data_2.npy")
+train_data = getData("./data/")
+# train_data = np.load("yellow_window_data_2.npy")
 # print(train_data_1.shape)
 # train_data2 = np.load("yellow_window_data_25.npy")
 # train_data = np.concatenate([train_data_1,train_data2],axis=0)
 # print(train_data.shape)
 
-plot_data_hist(train_data[:,0], "red")
-plot_data_hist(train_data[:,1], "green")
-plot_data_hist(train_data[:,2], "blue")
-# input('a')
+# plot_data_hist(train_data[:,0], "red")
+# plot_data_hist(train_data[:,1], "green")
+# plot_data_hist(train_data[:,2], "blue")
+# # input('a')
 
-gmm = GMM(train_data)
-mix_c, parameters = gmm.GMM(4)
-print mix_c, parameters
-save_models(mix_c, './training_params/window_weights_4', parameters, './training_params/gaussian_params_4')
+# gmm = GMM(train_data)
+# mix_c, parameters = gmm.GMM(4)
+# print mix_c, parameters
+# save_models(mix_c, './training_params/window_weights_4', parameters, './training_params/gaussian_params_4')
 
