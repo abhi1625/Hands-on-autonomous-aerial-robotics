@@ -34,7 +34,8 @@ class video_stream:
 
 			#run GMM inference to generate mask
 			mask = test_combined(processed_img,self.K,self.n,self.weights, self.params,(0,255,0))
-			self.window_detection.detection_hough_lines(processed_img,mask)
+			#self.window_detection.detection_hough_lines(processed_img,mask)
+			self.window_detection.Detection_using_threshold(processed_img)
 	
 class Window_detection:
 	def __init__(self):
@@ -145,30 +146,34 @@ class Window_detection:
 		return rotVec,transVec
 
 
-	def Detection_using_threshold(self):
-		vidcap = cv2.VideoCapture(self.data_path)
-		count = 0
-		while count <250:
-			success,img = vidcap.read()
+	def Detection_using_threshold(self,img):
+		#vidcap = cv2.VideoCapture(self.data_path)
+		#count = 0
+		#while count <250:
+		#	success,img = vidcap.read()
 		# while count<1:
-			if((count<250) and(count%40 ==0)):
-				# print("image dim = ",np.shape(img))
-				print('Read frame # ', count+1)
-				
-				img = self.rotate_img_90_deg(img)
-				img_pink = np.logical_and(np.logical_and(img[:,:,2]>200,img[:,:,0]>130,img[:,:,0]<200),img[:,:,1]<150)
-				
-				img_pink = np.dstack((img_pink,img_pink,img_pink))
-				img_pink = img_pink*img
+		# if((count<250) and(count%40 ==0)):
+			# print("image dim = ",np.shape(img))
+			# print('Read frame # ', count+1)
+		
+		# img = self.rotate_img_90_deg(img)
+		print("mean r = ", np.mean(np.mean(img[:,:,0])))
+		print("mean g = ", np.mean(np.mean(img[:,:,1])))
+		print("mean b = ", np.mean(np.mean(img[:,:,2])))
 
-				corner_pts = self.get_all_corners(img_pink,img)
-				imgPoints = self.get_outer_window_corner_points(corner_pts, img)
-				print ("imgPoints = ",imgPoints)
-				rotVec,transVec = self.pnp(imgPoints,img)
-				
-			if cv2.waitKey(1)& 0xff==ord('q'):
-				cv2.destroyAllWindows()
-			count += 1
+		img_pink = np.logical_and(np.logical_and(img[:,:,0]<10,img[:,:,0]>130,img[:,:,0]<200),img[:,:,1]<150)
+		
+		img_pink = np.dstack((img_pink,img_pink,img_pink))
+		img_pink = img_pink*img
+
+		corner_pts = self.get_all_corners(img_pink,img)
+		imgPoints = self.get_outer_window_corner_points(corner_pts, img)
+		print ("imgPoints = ",imgPoints)
+		rotVec,transVec = self.pnp(imgPoints,img)
+			
+		# if cv2.waitKey(1)& 0xff==ord('q'):
+		# 	cv2.destroyAllWindows()
+			# count += 1
 
 	def detection_hough_lines(self,img, mask):
 		# img = cv2.imread(self.original_image)
