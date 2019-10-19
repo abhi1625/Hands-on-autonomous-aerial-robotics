@@ -29,7 +29,7 @@ class moveit:
 		self.areas = []
 		self.odom_list = []
 		self.dt = 0.1
-		self.Kp = [0.1, 0.1, 0.2,0.,0.,0.0]
+		self.Kp = [0.1, 0.1, 0.1,0.,0.,0.05]
 		self.inFlight = False
 		self.vel_pub_rate = rospy.Rate(10)
 		self.vel_sp = np.zeros((6,))
@@ -101,10 +101,10 @@ class moveit:
 	# 		t+=dt
 	# 		self.vel_pub_rate.sleep()
 
-	def move(self):
+	def move(self,ref):
 
 		vel = Twist()
-		ref = self.vel_sp
+		# ref = self.vel_sp
 		# dt = 0.1
 		while ((not rospy.is_shutdown())):
 			abs_curr_state = self.current_state - self.bias
@@ -135,7 +135,7 @@ class moveit:
 def main():
 	rospy.init_node('position_hold', anonymous=True)
 	pos_hld = moveit()
-	pos_hld.takeoff()
+	# pos_hld.takeoff()
 	time.sleep(3)
 	pos_hld.calculate_bias()
 	time.sleep(1)

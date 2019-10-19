@@ -6,31 +6,31 @@ import math
 import matplotlib.pyplot as plt
 import rospy
 import time
-from std_msgs.msg import Empty
+from std_msgs.msg import Empty, String
 from geometry_msgs.msg import Twist, Pose
 from nav_msgs.msg import Odometry
 from GMM.test_data import *
 from window_detection import *
 from sensor_msgs.msg import Image
-from cv_bridge import CvBridge, CvBridgeError
+# from cv_bridge import CvBridge, CvBridgeError
 
 
-class video_stream:
-	def __init__(self):
-		self.bridge = CvBridge()
-		self.image_sub = rospy.Subscriber("/image_raw", Image, self.img_callback)
-		self.image_data = None
+# class video_stream:
+# 	def __init__(self):
+# 		self.bridge = CvBridge()
+# 		self.image_sub = rospy.Subscriber("/image_raw", Image, self.img_callback)
+# 		self.image_data = None
 
-	def img_callback(self, data):
-		try:
-			cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
-		except CvBridgeError as e:
-			print(e)
+# 	def img_callback(self, data):
+# 		try:
+# 			cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+# 		except CvBridgeError as e:
+# 			print(e)
 		
-		self.image_data = cv_image
+# 		self.image_data = cv_image
 
-	def get_img(self):
-		return self.image_data
+# 	def get_img(self):
+# 		return self.image_data
 
 # step size(dt) = 0.5 @ 10 hz publish rate = 1 meter dist travel
 class allign_quad :
@@ -40,6 +40,7 @@ class allign_quad :
 		self.vel_pub = rospy.Publisher('/bebop/cmd_vel', Twist, queue_size=10)
 		self.land_pub = rospy.Publisher('/bebop/land', Empty, queue_size=1 , latch=True)
 		self.cam_pose_sub = rospy.Subscriber('/relative_pose',Twist,self.cam_pose_cb)
+		self.vision_status_sub = rospy.Subscriber('/vision_status',String,self.vision_status_cb)
 		
 		self.inFlight = False
 		self.pose = Pose()
@@ -48,28 +49,32 @@ class allign_quad :
 		self.bias_y = 0
 		self.bias_z = 0
 		self.prev_error = 0
-		self.vs = video_stream()
+		# self.vs = video_stream()
 		self.velocity_msg = Twist()
-		self.image = self.vs.get_img()
+		# self.image = self.vs.get_img()
 		weights_path = './GMM/training_params/window_weights.npy'
 		params_path = './GMM/training_params/gaussian_params.npy'
 		self.n, self.K, self.weights, self.params = loadparamsGMM(weights_path, params_path)
 		self.areas = []
 		self.odom_list = []
 		self.dt = 0.1
-		self.Kp = [1.5, 1.5, 1.5,0,0,1]
+		self.Kp = [3.0, 1.5, 1.5,0,0,0.5]
 		self.inFlight = False
 		self.vel_pub_rate = rospy.Rate(10)
 		self.height_offset = 1
-		self.y_thresh = 0.2
+		self.x_thresh = 2 
+		self.y_thresh = 0.05
 		self.z_thresh = 0.2
 		self.yaw_thresh = 0.05
 		self.x = 0.0
 		self.y = 0.0
 		self.z = 0.0
 		self.yaw = 0.0
+		self.vision_status = "inactive"
 
 
+	def vision_status_cb(self,data):
+		self.vision_status = data.data
 	def cam_pose_cb(self,data):
 		self.x = data.linear.x
 		self.y = data.linear.y
@@ -104,19 +109,19 @@ class allign_quad :
 		# print "twist ", self.Twist
 
 
-	def routine(self):
-		if self.image is not None:
-			processed_img = preprocess_img(self.image)
+	# def routine(self):
+	# 	if self.image is not None:
+	# 		processed_img = preprocess_img(self.image)
 
-			#run GMM inference to generate mask
-			mask = test_combined(processed_img,self.K,self.n,self.weights, self.params,(0,255,0))
-			area = np.count_nonzero(mask)
-			self.areas.append(area)
-			self.odom_list.append(self.odom_data)
-			return True
-		else:
-			rospy.loginfo("got no image ")
-			return False
+	# 		#run GMM inference to generate mask
+	# 		mask = test_combined(processed_img,self.K,self.n,self.weights, self.params,(0,255,0))
+	# 		area = np.count_nonzero(mask)
+	# 		self.areas.append(area)
+	# 		self.odom_list.append(self.odom_data)
+	# 		return True
+	# 	else:
+	# 		rospy.loginfo("got no image ")
+	# 		return False
 	def orient(self, twist_msg):
 		self.velocity_msg = twist_msg
 		self.vel_pub.publish(self.velocity_msg)
@@ -147,13 +152,13 @@ class allign_quad :
 # 			self.vel_pub_rate.sleep()
 # *********************************************************
 
-	def max_pts(self,):
-		img = self.vs.get_img()
-		img[img[:,:,0]<2 and img[:,:,0]>237] = 0 
-		img[img[:,:,0]<74 and img[:,:,0]>237] = 208
-		img[img[:,:,0]<72 and img[:,:,0]>237] = 100
-		area = np.count_nonzero(img)
-		return area 
+	# def max_pts(self,):
+	# 	img = self.vs.get_img()
+	# 	img[img[:,:,0]<2 and img[:,:,0]>237] = 0 
+	# 	img[img[:,:,0]<74 and img[:,:,0]>237] = 208
+	# 	img[img[:,:,0]<72 and img[:,:,0]>237] = 100
+	# 	area = np.count_nonzero(img)
+	# 	return area 
 	def move(self,ref):
 		vel = Twist()
 		# vel.angular.z = 
@@ -249,16 +254,27 @@ class allign_quad :
 	# 	return vel_out_yaw
 
 
-	def open_loop_align(self,y,z,yaw):
+	def open_loop_align(self,x,y,z,yaw):
 		vel = Twist()
 		t = 0
 		dt = 0.1
 		# self.ref_y
 		# self.ref_z
 		# self.ref_yaw
-		while ((not rospy.is_shutdown()) and t <= 0.4):
+		# while ((not rospy.is_shutdown()) and t <= 0.4):
+		while (t <= 0.4):
 
-			vel.linear.x = 0
+			if self.x>1.5:
+				if x == 1:
+					vel.linear.x = dt*self.Kp[0]
+				elif x == -1:
+					vel.linear.x = -dt*self.Kp[0]
+				else:
+					vel.linear.x = 0
+			else:
+					print("reached min limit, now punch")
+					vel.linear.x = 0
+
 			if y == 1:
 				vel.linear.y = dt*self.Kp[1]
 			elif y == -1:
@@ -296,6 +312,14 @@ class allign_quad :
 		else:
 			y = 0
 
+
+		if(self.x>0):
+			x = 1
+		elif(self.x<0):
+			x = -1
+		else:
+			x = 0
+
 		if(self.z>0):
 			z = 1
 		elif(self.z<0):
@@ -309,43 +333,126 @@ class allign_quad :
 			yaw = -1
 		else:
 			yaw = 0
-		return y,z,yaw
+		return x,y,z,yaw
 
-	def align_y_z_yaw(self):
+	def punch(self):
+		vel = Twist()
+		t = 0
+		dt = 0.1
+		kp_x = 3
+		while((not rospy.is_shutdown()) and t<1):
+			vel.linear.x = dt*kp_x
+			vel.linear.y = 0
+			vel.linear.z = 0
 
-		y,z,yaw = self.dir_check()
+			vel.angular.x = 0
+			vel.angular.y = 0
+			vel.angular.z = 0
 
-		self.open_loop_align(y,z,yaw)
+			self.orient(vel)
+			t+=dt
+			self.vel_pub_rate.sleep()
+			t+=1
+
+
+	def align_y_z_yaw_safe(self):
+
+			x,y,z,yaw = self.dir_check()
+			prev_x = x
+			prev_y = y
+			prev_z = z
+			prev_yaw = yaw
+
+			self.open_loop_align(x,y,z,yaw)
+			time.sleep(3)
+			dt = 0
+			t = 0
+			# count =0
+			while((abs(self.z)<abs(self.z_thresh) and abs(self.y)<abs(self.y_thresh)and abs(self.x)<abs(self.x_thresh)) or t < 10 or (not rospy.is_shutdown())):
+				if dt>=5:
+					time.sleep(1)
+					dt = 0
+					t =+ 1
+				print("y,z,yaw",self.x,self.y,self.z,self.yaw)
+				x,y,z,yaw = self.dir_check()
+				if self.vision_status == "active":
+					self.open_loop_align(x,y,z,yaw)
+					print("active")
+				else:
+					self.open_loop_align(0,0,0,-prev_yaw)
+					print("not active")
+					# count = 0
+					
+
+				time.sleep(3)
+				prev_x = x
+				prev_y = y
+				prev_z = z
+				prev_yaw = yaw
+				dt+=0.1
+			print("align ended")		
+
+	def align_y_z_yaw_count(self):
+
+		x,y,z,yaw = self.dir_check()
+		prev_x = x
+		prev_y = y
+		prev_z = z
+		prev_yaw = yaw
+
+		self.open_loop_align(x,y,z,yaw)
 		time.sleep(3)
 		dt = 0
 		t = 0
-		while((abs(self.yaw)<abs(self.yaw_thresh) and abs(self.y)<abs(self.y_thresh)) or t < 10 or (not rospy.is_shutdown())):
+		count =0
+		while((abs(self.z)<abs(self.z_thresh_) and abs(self.y)<abs(self.y_thresh)and abs(self.x)<abs(self.x_thresh)) or t < 10 or (not rospy.is_shutdown())):
 			if dt>=5:
-				time.sleep(3)
+				time.sleep(1)
 				dt = 0
 				t =+ 1
-			print("y,z,yaw",self.y,self.z,self.yaw)
-			y,z,yaw = self.dir_check()
-			self.open_loop_align(y,z,yaw)
+			print("y,z,yaw",self.x,self.y,self.z,self.yaw)
+			x,y,z,yaw = self.dir_check()
+			if self.vision_status == "inactive":
+				count += 1
+			# if (self.vision_status == "active"):
+			if count >= 5:
+				self.open_loop_align(0,0,0,-prev_yaw)
+				print("not active")
+				count = 0
+			else:
+				self.open_loop_align(x,y,z,yaw)
+				print("active")
+				
+
 			time.sleep(3)
+			prev_x = x
+			prev_y = y
+			prev_z = z
+			prev_yaw = yaw
 			dt+=0.1
 		print("align ended")		
 			
 		
 
-	def find_max_area(self):
-			self.calculate_bias()
-			time.sleep(1)
-			self.yaw_c(np.pi/60,0.2)
-			print("done yaw c")
-			time.sleep(1)
-			self.yaw_cc(np.pi/30,0.4)
-			time.sleep(2)
-			self.move_up(0.6)
-			time.sleep(1)
-			self.yaw_c(np.pi/60,0.2)
-			time.sleep(1)
-			self.yaw_c(np.pi/60,0.2)
+	def state_machine(self):
+		if (self.x>=1.5 and self.x is not 0):
+			self.align_y_z_yaw_count()
+		else:
+			self.align_y_z_yaw_safe()
+			self.punch()
+	# def find_max_area(self):
+	# 		self.calculate_bias()
+	# 		time.sleep(1)
+	# 		self.yaw_c(np.pi/60,0.2)
+	# 		print("done yaw c")
+	# 		time.sleep(1)
+	# 		self.yaw_cc(np.pi/30,0.4)
+	# 		time.sleep(2)
+	# 		self.move_up(0.6)
+	# 		time.sleep(1)
+	# 		self.yaw_c(np.pi/60,0.2)
+	# 		time.sleep(1)
+	# 		self.yaw_c(np.pi/60,0.2)
 
 	
 		# Task
@@ -363,8 +470,9 @@ if __name__ == '__main__':
 	rospy.init_node('align_quad', anonymous=True)
 	pid = allign_quad()
 	pid.takeoff()
+	time.sleep(3)
 	# rospy.on_shutdown(pid.land())
-	pid.align_y_z_yaw()
+	pid.state_machine()
 	# sin_xy()
 	# rhombus_traj()
 	# sawtooth_traj()
