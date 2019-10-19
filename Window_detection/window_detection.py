@@ -46,8 +46,9 @@ class Window_detection:
 		self.data_path = '/home/abhinav/drone_course_data/window_detection/pink_window.mp4'
 		self.image_path = './GMM/test_image.jpg'
 		self.original_image = '/home/abhinav/drone_course_data/Window_detection/GMM/data/GMM_1/frame0200.jpg'
-		self.image_pub = rospy.Publisher("/gmm_img", Image, queue_size = 2)
+		# self.image_pub = rospy.Publisher("/gmm_img", Image, queue_size = 1)
 		self.pose_pub = rospy.Publisher("/relative_pose", Twist, queue_size = 1)
+		self.state_pub = rospy.Publisher("/vision_status", String, queue_size = 1)
 		self.twist_obj = Twist()
 		self.bridge = CvBridge()
 
@@ -84,7 +85,7 @@ class Window_detection:
 		# edges = cv2.Canny(gray,50,150,apertureSize = 3)
 		edges = gray
 		# print("canny type", np.shape(edges))
-		cv2.imshow('image',edges)
+		# cv2.imshow('image',edges)
 		kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(31,31))
 		# closing to fill unwanted small gaps
 		closing = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
@@ -193,8 +194,8 @@ class Window_detection:
 	def detection_hough_lines(self,original_img, mask):
 		# img = cv2.imread(self.original_image)
 		# mask = cv2.imread(self.image_path,0)
-		n_rows = int(original_img.shape[0]/4)
-		n_cols = int(original_img.shape[1]/4)	
+		n_rows = int(original_img.shape[0]/8)
+		n_cols = int(original_img.shape[1]/8)	
 		img = cv2.resize(original_img, (n_cols, n_rows))
 		mask = cv2.inRange(mask, 150, 255)
 		
@@ -273,11 +274,23 @@ class Window_detection:
 				self.goodCorners = np.array([self.top_left, self.top_right, self.bottom_right, self.bottom_left])
 				rotVec,transVec = self.pnp(self.goodCorners,original_img)
 
+				#publish quads pose relative to window
+				# quad_x = camera_frame z
+				# quad_y = camera_frame -x
+				# quad_z = camera_frame -y
+				# quad_yaw(counterclockwise) = camera_frame yaw(clockwise) 
+				# window coordinates = [0,0,0] , [84,0,0]
+				#					   [3,43,0], [81,43,0]
+				# window center coordinates = [42,21.5,0]
+				self.twist_obj.linear.x = (transVec[2,0])/100 			#in m
+				self.twist_obj.linear.y = -(transVec[0,0] + 41.0)/100 	#in m
+				self.twist_obj.linear.z = -(transVec[1,0] - 21.5)/100  	#in m
+				self.twist_obj.angular.z = -rotVec[1]
 
-				
-
-
+				self.pose_pub.publish(self.twist_obj)
+				self.state_pub.publish("active")
 		else:
+			self.state_pub.publish("inactive")
 			pass
 		# corner_pts = self.get_all_corners(houghlines, original_img)
 		# imgPoints = self.get_outer_window_corner_points(corner_pts, original_img)
@@ -292,20 +305,6 @@ class Window_detection:
 		cv2.circle(original_img, tuple((int(self.bottom_right[0]), int(self.bottom_right[1]))), 5, (0,0,0), -1)
 		cv2.circle(original_img, tuple((int(self.bottom_left[0]), int(self.bottom_left[1]))), 5, (0,0,0), -1)
 
-		#publish quads pose relative to window
-		# quad_x = camera_frame z
-		# quad_y = camera_frame -x
-		# quad_z = camera_frame -y
-		# quad_yaw(counterclockwise) = camera_frame yaw(clockwise) 
-		# window coordinates = [0,0,0] , [84,0,0]
-		#					   [3,43,0], [81,43,0]
-		# window center coordinates = [42,21.5,0]
-		self.twist_obj.linear.x = (transVec[2,0])/100 			#in m
-		self.twist_obj.linear.y = -(transVec[0,0] - 42.0)/100 	#in m
-		self.twist_obj.linear.z = -(transVec[1,0] - 21.5)/100  	#in m
-		self.twist_obj.angular.z = -rotVec[1]
-
-		self.pose_pub.publish(self.twist_obj)
 
 		# for i in range(imgPoints.shape[0]):
 		# 	pt = imgPoints[i]
@@ -313,12 +312,12 @@ class Window_detection:
 		# except:
 		# 	pass
 
-		cv2.imshow('frame',original_img)
-		if cv2.waitKey(1) & 0xFF == ord('q'):
-			cv2.destroyAllWindows()
+		# cv2.imshow('frame',original_img)
+		# if cv2.waitKey(1) & 0xFF == ord('q'):
+		# 	cv2.destroyAllWindows()
 		# masked_img = cv2.resize(img, (int(img.shape[1]/2), (int(img.shape[0]/2))))
 		cv_image = self.bridge.cv2_to_imgmsg(original_img, "bgr8")
-		self.image_pub.publish(cv_image)
+		# self.image_pub.publish(cv_image)
 
 	# def Detection_using_threshold_image(self, mask):
 	# 	# img = cv2.imread(self.original_image)

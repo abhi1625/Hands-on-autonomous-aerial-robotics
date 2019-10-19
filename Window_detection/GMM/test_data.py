@@ -87,8 +87,8 @@ def gaussian(data,mean,cov):
 def test_combined(test_image,K,n_factor,weights, parameters,color):
 	shape1 = test_image.shape[0]
 	shape2 = test_image.shape[1]
-	n_rows = int(shape1/4)
-	n_cols = int(shape2/4)
+	n_rows = int(shape1/8)
+	n_cols = int(shape2/8)
 	test_image = cv2.resize(test_image, (n_cols, n_rows))
 	# print(test_image.shape)
 	frame = test_image[:,:,:]
