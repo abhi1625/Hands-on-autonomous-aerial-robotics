@@ -114,7 +114,7 @@ def test_combined(test_image,K,n_factor,weights, parameters,color):
 	# test = np.uint8(probabilities*255/np.max(probabilities))
 	
 	# # probabilities[probabilities > np.max(probabilities)/80] = 0
-	probabilities[(probabilities > np.max(probabilities)/12)] = 255
+	probabilities[(probabilities > np.max(probabilities)/5)] = 255
 	# probabilities = cv2.resize(probabilities, (shape2, shape1))
 	# plt.imshow(probabilities)
 	# plt.show()
@@ -126,6 +126,13 @@ def preprocess_img(test_image):
 	# convert = tune_RGB(test_image)
 	# convert = tune_HSV(test_image)
 	# adjusted = cv2.convertScaleAbs(test_image, alpha = 1.5, beta = 1)
+	camMatrix = np.array([[685.6401304538527, 0 , 428.4278693789007],[0, 683.912176820224, 238.21676543821124],[0,0,1]],dtype=np.float32)
+
+	#distortion coefficients 
+        distCoeffs = np.array([-0.3511457668628365, 0.17436456235827277, 0.0031539770836337432,
+    0.0017830224931076294],dtype=np.float64)
+
+	test_image = cv2.undistort(test_image,camMatrix,distCoeffs )
 	convert = adjust_gamma(test_image, gamma = 1.5)
 	test_image = cv2.medianBlur(convert, 5)
 	# convert = cv2.fastNlMeansDenoisingColored(convert, None, 3, 3, 7, 15)
@@ -143,7 +150,7 @@ def loadparamsGMM(weights_path, params_path):
 # 	weights = np.load('./training_params/window_weights.npy', allow_pickle=True)
 # 	parameters = np.load('./training_params/gaussian_params.npy', allow_pickle=True)
 # 	K = 2
-# 	n = 0.1
+# 	n = 0.1/
 
 # 	test_image_path  = '/home/abhinav/Gits/drone-course/drone_course_data/Window_detection/GMM/data/GMM_1/frame0200.jpg'
 # 	test_image = cv2.imread(test_image_path)

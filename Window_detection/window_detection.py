@@ -284,7 +284,7 @@ class Window_detection:
 				# window center coordinates = [42,21.5,0]
 				self.twist_obj.linear.x = (transVec[2,0])/100 			#in m
 				self.twist_obj.linear.y = -(transVec[0,0] + 41.0)/100 	#in m
-				self.twist_obj.linear.z = -(transVec[1,0] - 21.5)/100  	#in m
+				self.twist_obj.linear.z = -(transVec[1,0] + 21.5)/100  	#in m
 				self.twist_obj.angular.z = -rotVec[1]
 
 				self.pose_pub.publish(self.twist_obj)
@@ -312,9 +312,9 @@ class Window_detection:
 		# except:
 		# 	pass
 
-		# cv2.imshow('frame',original_img)
-		# if cv2.waitKey(1) & 0xFF == ord('q'):
-		# 	cv2.destroyAllWindows()
+		#cv2.imshow('frame',houghlines_gray)
+		#if cv2.waitKey(1) & 0xFF == ord('q'):
+		#	cv2.destroyAllWindows()
 		# masked_img = cv2.resize(img, (int(img.shape[1]/2), (int(img.shape[0]/2))))
 		cv_image = self.bridge.cv2_to_imgmsg(original_img, "bgr8")
 		# self.image_pub.publish(cv_image)
