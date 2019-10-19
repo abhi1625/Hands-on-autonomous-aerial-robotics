@@ -5,6 +5,8 @@ import sys
 import matplotlib.pyplot as plt
 import math
 import os
+from scipy.stats import multivariate_normal
+import time
 
 def tune_HSV(img):
 	img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -83,39 +85,47 @@ def gaussian(data,mean,cov):
 		
 		
 def test_combined(test_image,K,n_factor,weights, parameters,color):
-
-	    		
-	nx = test_image.shape[0]
-	ny = test_image.shape[1]
+	shape1 = test_image.shape[0]
+	shape2 = test_image.shape[1]
+	n_rows = int(shape1/4)
+	n_cols = int(shape2/4)
+	test_image = cv2.resize(test_image, (n_cols, n_rows))
+	# print(test_image.shape)
 	frame = test_image[:,:,:]
 	img = test_image
 	ch = img.shape[2]
-	img = np.reshape(img, (nx*ny,ch))
+	img = np.reshape(img, (n_cols*n_rows,ch))
 	
-	prob = np.zeros((nx*ny,K))
+	prob = np.zeros((n_cols*n_rows,K))
 	
-	likelihood = np.zeros((nx*ny,K))
+	likelihood = np.zeros((n_rows*n_cols,K))
 	
 	for cluster in range(K):
-	   prob[:,cluster:cluster+1] = weights[cluster]*gaussian(img,parameters[cluster]['mean'], parameters[cluster]['cov'])
-	   
+	   # prob[:,cluster:cluster+1] = weights[cluster]*gaussian(img,parameters[cluster]['mean'], parameters[cluster]['cov'])
+	   # st = time.time()
+	   probability = weights[cluster]*multivariate_normal.pdf(img,mean = parameters[cluster]['mean'], cov = parameters[cluster]['cov'])
+	   # print("time = ", (time.time() - st) )
+	   prob[:,cluster:cluster+1] = np.reshape(probability,(-1,1))
 	   likelihood = prob.sum(1)
 	   
+			
+	probabilities = np.reshape(likelihood,(n_cols,n_rows))
+	probabilities = cv2.resize(probabilities, (shape2, shape1))
+	# print(probabilities.shape)
+	# test = np.uint8(probabilities*255/np.max(probabilities))
 	
-	probabilities = np.reshape(likelihood,(nx,ny))
-	test = np.uint8(probabilities*255/np.max(probabilities))
-	
-	# probabilities[probabilities > np.max(probabilities)/80] = 0
+	# # probabilities[probabilities > np.max(probabilities)/80] = 0
 	probabilities[(probabilities > np.mean(probabilities)/n_factor)] = 255
 	# plt.imshow(probabilities)
 	# plt.show()
-
+	# print("frame processed")
 	return probabilities	
 			
 def preprocess_img(test_image):
 	# convert = tune_RGB(test_image)
 	# convert = tune_HSV(convert)
-	convert = adjust_gamma(test_image, gamma = 1.5)
+	adjusted = cv2.convertScaleAbs(test_image, alpha = 1.5, beta = 1)
+	convert = adjust_gamma(adjusted, gamma = 1.5)
 	test_image = cv2.medianBlur(convert, 5)
 	# convert = cv2.fastNlMeansDenoisingColored(convert, None, 3, 3, 7, 15)
 	test_image = cv2.cvtColor(test_image, cv2.COLOR_BGR2RGB)

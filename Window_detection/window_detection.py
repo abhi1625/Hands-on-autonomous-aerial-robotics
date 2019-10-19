@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import rospy
+from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 try:
@@ -19,23 +20,24 @@ class video_stream:
 		self.bridge = CvBridge()
 		self.image_sub = rospy.Subscriber("/image_raw", Image, self.img_callback)
 		self.window_detection = Window_detection()
-		weights_path = './GMM/training_params/window_weights.npy'
-		params_path = './GMM/training_params/gaussian_params.npy'
+		weights_path = './GMM/training_params/window_weights_4.npy'
+		params_path = './GMM/training_params/gaussian_params_4.npy'
 		self.n, self.K, self.weights, self.params = loadparamsGMM(weights_path, params_path)
 
 	def img_callback(self, data):
 		try:
 			cv_image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+			print('got frame')
 		except CvBridgeError as e:
 			print(e)
 		
 		if cv_image is not None:
 			processed_img = preprocess_img(cv_image)
 
-			#run GMM inference to generate mask
+		# run GMM inference to generate mask
 			mask = test_combined(processed_img,self.K,self.n,self.weights, self.params,(0,255,0))
-			#self.window_detection.detection_hough_lines(processed_img,mask)
-			self.window_detection.Detection_using_threshold(processed_img)
+			self.window_detection.detection_hough_lines(processed_img,mask)
+			#self.windo1w_detection.Detection_using_threshold(processed_img)
 	
 class Window_detection:
 	def __init__(self):
@@ -179,6 +181,8 @@ class Window_detection:
 		# img = cv2.imread(self.original_image)
 		# mask = cv2.imread(self.image_path,0)
 		mask = cv2.inRange(mask, 200, 255)
+		print mask.shape
+		print img.shape
 		masked_img = cv2.bitwise_and(img, img, mask = mask)
 
 		gray = cv2.cvtColor(masked_img,cv2.COLOR_BGR2GRAY)
