@@ -2,6 +2,7 @@
 import rospy
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
+from geometry_msgs.msg import Twist 
 from cv_bridge import CvBridge, CvBridgeError
 try:
 	sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages/')
@@ -20,8 +21,8 @@ class video_stream:
 		self.bridge = CvBridge()
 		self.image_sub = rospy.Subscriber("/image_raw", Image, self.img_callback)
 		self.window_detection = Window_detection()
-		weights_path = '/home/abhinav/Gits/drone-course/Window_detection/GMM/training_params/window_weights_4.npy'
-		params_path = '/home/abhinav/Gits/drone-course/Window_detection/GMM/training_params/gaussian_params_4.npy'
+		weights_path = './GMM/training_params/window_weights_4.npy'
+		params_path = './GMM/training_params/gaussian_params_4.npy'
 		self.n, self.K, self.weights, self.params = loadparamsGMM(weights_path, params_path)
 
 	def img_callback(self, data):
@@ -45,7 +46,9 @@ class Window_detection:
 		self.data_path = '/home/abhinav/drone_course_data/window_detection/pink_window.mp4'
 		self.image_path = './GMM/test_image.jpg'
 		self.original_image = '/home/abhinav/drone_course_data/Window_detection/GMM/data/GMM_1/frame0200.jpg'
-		self.image_pub = rospy.Publisher("/gmm_img", Image, queue_size=2)
+		self.image_pub = rospy.Publisher("/gmm_img", Image, queue_size = 2)
+		self.pose_pub = rospy.Publisher("/relative_pose", Twist, queue_size = 1)
+		self.twist_obj = Twist()
 		self.bridge = CvBridge()
 
 		################################################
@@ -127,7 +130,7 @@ class Window_detection:
 		objPoints = np.array([[0,0,0],
 							 [84,0,0],
 							 [81,43,0],
-							 [0,43,0]], dtype=np.float64)
+							 [3,43,0]], dtype=np.float64)
 
 		# Camera K matrix(intrinsic params)
 		camMatrix = np.array([[685.6401304538527, 0 , 428.4278693789007],[0, 683.912176820224, 238.21676543821124],[0,0,1]],dtype=np.float32)
@@ -158,34 +161,34 @@ class Window_detection:
 		return rotVec,transVec
 
 
-	def Detection_using_threshold(self,img):
-		#vidcap = cv2.VideoCapture(self.data_path)
-		#count = 0
-		#while count <250:
-		#	success,img = vidcap.read()
-		# while count<1:
-		# if((count<250) and(count%40 ==0)):
-			# print("image dim = ",np.shape(img))
-			# print('Read frame # ', count+1)
+	# def Detection_using_threshold(self,img):
+	# 	#vidcap = cv2.VideoCapture(self.data_path)
+	# 	#count = 0
+	# 	#while count <250:
+	# 	#	success,img = vidcap.read()
+	# 	# while count<1:
+	# 	# if((count<250) and(count%40 ==0)):
+	# 		# print("image dim = ",np.shape(img))
+	# 		# print('Read frame # ', count+1)
 		
-		# img = self.rotate_img_90_deg(img)
-		print("mean r = ", np.mean(np.mean(img[:,:,0])))
-		print("mean g = ", np.mean(np.mean(img[:,:,1])))
-		print("mean b = ", np.mean(np.mean(img[:,:,2])))
+	# 	# img = self.rotate_img_90_deg(img)
+	# 	print("mean r = ", np.mean(np.mean(img[:,:,0])))
+	# 	print("mean g = ", np.mean(np.mean(img[:,:,1])))
+	# 	print("mean b = ", np.mean(np.mean(img[:,:,2])))
 
-		img_pink = np.logical_and(np.logical_and(img[:,:,0]<10,img[:,:,0]>130,img[:,:,0]<200),img[:,:,1]<150)
+	# 	img_pink = np.logical_and(np.logical_and(img[:,:,0]<10,img[:,:,0]>130,img[:,:,0]<200),img[:,:,1]<150)
 		
-		img_pink = np.dstack((img_pink,img_pink,img_pink))
-		img_pink = img_pink*img
+	# 	img_pink = np.dstack((img_pink,img_pink,img_pink))
+	# 	img_pink = img_pink*img
 
-		corner_pts = self.get_all_corners(img_pink,img)
-		imgPoints = self.get_outer_window_corner_points(corner_pts, img)
-		print ("imgPoints = ",imgPoints)
-		rotVec,transVec = self.pnp(imgPoints,img)
+	# 	corner_pts = self.get_all_corners(img_pink,img)
+	# 	imgPoints = self.get_outer_window_corner_points(corner_pts, img)
+	# 	print ("imgPoints = ",imgPoints)
+	# 	rotVec,transVec = self.pnp(imgPoints,img)
 			
-		# if cv2.waitKey(1)& 0xff==ord('q'):
-		# 	cv2.destroyAllWindows()
-			# count += 1
+	# 	# if cv2.waitKey(1)& 0xff==ord('q'):
+	# 	# 	cv2.destroyAllWindows()
+	# 		# count += 1
 
 	def detection_hough_lines(self,original_img, mask):
 		# img = cv2.imread(self.original_image)
@@ -270,6 +273,10 @@ class Window_detection:
 				self.goodCorners = np.array([self.top_left, self.top_right, self.bottom_right, self.bottom_left])
 				rotVec,transVec = self.pnp(self.goodCorners,original_img)
 
+
+				
+
+
 		else:
 			pass
 		# corner_pts = self.get_all_corners(houghlines, original_img)
@@ -285,6 +292,21 @@ class Window_detection:
 		cv2.circle(original_img, tuple((int(self.bottom_right[0]), int(self.bottom_right[1]))), 5, (0,0,0), -1)
 		cv2.circle(original_img, tuple((int(self.bottom_left[0]), int(self.bottom_left[1]))), 5, (0,0,0), -1)
 
+		#publish quads pose relative to window
+		# quad_x = camera_frame z
+		# quad_y = camera_frame -x
+		# quad_z = camera_frame -y
+		# quad_yaw(counterclockwise) = camera_frame yaw(clockwise) 
+		# window coordinates = [0,0,0] , [84,0,0]
+		#					   [3,43,0], [81,43,0]
+		# window center coordinates = [42,21.5,0]
+		self.twist_obj.linear.x = (transVec[2,0])/100 			#in m
+		self.twist_obj.linear.y = -(transVec[0,0] - 42.0)/100 	#in m
+		self.twist_obj.linear.z = -(transVec[1,0] - 21.5)/100  	#in m
+		self.twist_obj.angular.z = -rotVec[1]
+
+		self.pose_pub.publish(self.twist_obj)
+
 		# for i in range(imgPoints.shape[0]):
 		# 	pt = imgPoints[i]
 		# 	cv2.circle(original_img,tuple(pt),3,(0,0,255),-1)
@@ -298,18 +320,18 @@ class Window_detection:
 		cv_image = self.bridge.cv2_to_imgmsg(original_img, "bgr8")
 		self.image_pub.publish(cv_image)
 
-	def Detection_using_threshold_image(self, mask):
-		# img = cv2.imread(self.original_image)
-		# mask = cv2.imread(self.image_path,0)
-		mask = cv2.inRange(mask, 200, 255)
-		masked_img = cv2.bitwise_and(img, img, mask = mask)
-		print(masked_img.shape)
-		corner_pts = self.get_all_corners(masked_img, img)
-		imgPoints = self.get_outer_window_corner_points(corner_pts, img)
-		print ("imgPoints = ",imgPoints)
-		rotVec,transVec = self.pnp(imgPoints,img)
+	# def Detection_using_threshold_image(self, mask):
+	# 	# img = cv2.imread(self.original_image)
+	# 	# mask = cv2.imread(self.image_path,0)
+	# 	mask = cv2.inRange(mask, 200, 255)
+	# 	masked_img = cv2.bitwise_and(img, img, mask = mask)
+	# 	print(masked_img.shape)
+	# 	corner_pts = self.get_all_corners(masked_img, img)
+	# 	imgPoints = self.get_outer_window_corner_points(corner_pts, img)
+	# 	print ("imgPoints = ",imgPoints)
+	# 	rotVec,transVec = self.pnp(imgPoints,img)
 				
-		cv2.waitKey(0)
+	# 	cv2.waitKey(0)
 
 
 
