@@ -19,7 +19,6 @@ class moveit:
 		self.takeoff_pub = rospy.Publisher('/bebop/takeoff', Empty, queue_size=1 , latch=True)
 		self.bebop_vel_pub = rospy.Publisher('/bebop/cmd_vel', Twist, queue_size=10)
 		self.land_pub = rospy.Publisher('/bebop/land', Empty, queue_size=1 , latch=True)
-		self.vel_sp_sub = rospy.Subscriber('/cmd_vel_setpoint', Pose, self.vel_sp_cb)
 		self.cam_pose_sub = rospy.Subscriber('/relative_pose',Twist,self.cam_pose_cb)
 
 		self.inFlight = False
@@ -32,8 +31,6 @@ class moveit:
 		self.dt = 0.1
 		self.inFlight = False
 		self.vel_pub_rate = rospy.Rate(10)
-		self.vel_sp = np.zeros((6,))
-		self.vel_sp[2] = 1.0
 		self.current_state = np.zeros((6,))
 		self.x_sp = 0
 		self.y_sp = 0
@@ -51,13 +48,6 @@ class moveit:
 		self.z_sp = data.linear.z
 		self.yaw_sp = data.angular.z
 
-	def vel_sp_cb(self,data):
-		self.vel_sp[0] = -data.position.x
-		self.vel_sp[1] = data.position.y
-		self.vel_sp[2] = data.position.z
-		self.vel_sp[3] = data.orientation.x
-		self.vel_sp[4] = data.orientation.y
-		self.vel_sp[5] = data.orientation.z
 
 	def orient(self, twist_msg):
 		self.velocity_msg = twist_msg
@@ -93,21 +83,6 @@ class moveit:
 		# print("odom linear, is it array?", data.pose.pose.position)
 		# print "twist ", self.Twist
 
-	# def xline(self):
-
-	# 	vel = Twist()
-	# 	ref = self.vel_sp
-	# 	dt = 0.1
-	# 	t = 0
-	# 	while ((not rospy.is_shutdown()) and t <0.5):
-			
-	# 		vel.linear.x = 0
-	# 		vel.linear.y = 0
-	# 		vel.linear.z = dt*4
-
-	# 		vel.angular.x = 0
-	# 		vel.angular.y = 0
-	# 		vel.angular.z = 0
 
 	# 		# print("angular z = ", vel.angular.z)
 	# 		self.orient(vel)
@@ -118,7 +93,6 @@ class moveit:
 	def move(self,ref):
 
 		vel = Twist()
-		# ref = self.vel_sp
 		# dt = 0.1
 			# print("reference state = ", ref[:3])
 		while ((not rospy.is_shutdown())):
@@ -137,7 +111,7 @@ class moveit:
 			print("vel y",vel_arr_y)
 			err_z = ref[2] - current_abs_state[2]
 			vel_arr_z = self.Kp[2]*err_z
-			
+                        
 			print("vel z: ",vel_arr_z)
 					
 			err_yaw = -ref[-1] + current_abs_state[-1]
