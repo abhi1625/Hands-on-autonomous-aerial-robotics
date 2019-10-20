@@ -452,7 +452,7 @@ class allign_quad :
 			self.punch()
 
 	def state_machine(self):
-		if (self.x>=1.5 and abs(self.x) < 0.1):
+		if (abs(self.x)>=1.5 and abs(self.x) < 0.1):
 			self.align_y_z_yaw_count()
 		else:
 			self.align_y_z_yaw_safe()

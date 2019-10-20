@@ -20,6 +20,7 @@ class moveit:
 		self.bebop_vel_pub = rospy.Publisher('/bebop/cmd_vel', Twist, queue_size=10)
 		self.land_pub = rospy.Publisher('/bebop/land', Empty, queue_size=1 , latch=True)
 		self.vel_sp_sub = rospy.Subscriber('/cmd_vel_setpoint', Pose, self.vel_sp_cb)
+		self.cam_pose_sub = rospy.Subscriber('/relative_pose',Twist,self.cam_pose_cb)
 
 		self.inFlight = False
 		self.pose = Pose()
@@ -29,19 +30,26 @@ class moveit:
 		self.areas = []
 		self.odom_list = []
 		self.dt = 0.1
-		self.Kp = [0.1, 0.1, 0.1,0.,0.,0.05]
 		self.inFlight = False
 		self.vel_pub_rate = rospy.Rate(10)
 		self.vel_sp = np.zeros((6,))
 		self.vel_sp[2] = 1.0
 		self.current_state = np.zeros((6,))
-		self.biag_flag = False
-		self.bias_arr = []
-		self.bias_mean  = np.zeros((6,))
+		self.x_sp = 0
+		self.y_sp = 0
+		self.z_sp = 0
+		self.yaw_sp = 0
+		self.min_step = 0.2
+		self.max_step = 0.4
+		self.Kp = [0.05,0.05,0.08,0.0,0.0,0.01]
 
-	def  get_bias_mean(self):
-		print("bias mean = ", self.bias_mean)
-		return self.bias_mean
+
+	def cam_pose_cb(self,data):
+		self.x_sp = data.linear.x
+		self.y_sp = data.linear.y
+		self.z_sp = data.linear.z
+		self.yaw_sp = data.angular.z
+
 	def vel_sp_cb(self,data):
 		self.vel_sp[0] = -data.position.x
 		self.vel_sp[1] = data.position.y
@@ -61,13 +69,7 @@ class moveit:
 		self.bias[3] = self.pose.orientation.x
 		self.bias[4] = self.pose.orientation.y
 		self.bias[5] = self.pose.orientation.z
-		if len(self.bias_arr)<10:
-			self.bias_arr.append(self.bias)
-		elif len(self.bias_arr) == 10:
-			self.bias_mean = np.mean(np.array(self.bias_arr),axis = 0)
-			
 		
-				
 	def takeoff(self):
 		self.takeoff_pub.publish()
 		self.inFlight = True
@@ -112,49 +114,70 @@ class moveit:
 	# 		t+=dt
 	# 		self.vel_pub_rate.sleep()
 
-	#def state_machine(self):
-		
-
 	def move(self,ref):
 
 		vel = Twist()
 		# ref = self.vel_sp
 		# dt = 0.1
-		print("bias = ", self.bias_mean)
 		while ((not rospy.is_shutdown())):
-			abs_curr_state = self.current_state - self.bias_mean
-			print("reference state = ", ref[:3])
-			print("current_state = ", abs_curr_state[:3])
-			err = ref - abs_curr_state
+			# print("reference state = ", ref[:3])
+			# print("current_state = ", abs_curr_state[:3])
+			# err = ref + abs_curr_state
+
+			current_abs_state = self.current_state - self.bias
+			err_x = -ref[0] - current_abs_state[0]
+			vel_arr_x = self.Kp[0]*err_x
+			if vel_arr_x<self.min_step:
+				vel_arr_x = self.min_step
+
+			err_y = ref[1] - current_abs_state[1]
+			vel_arr_y = self.Kp[1]*err_y
+			if vel_arr_y<self.min_step:
+				vel_arr_y = self.min_step
+
+			err_z = ref[2] - current_abs_state[2]
+			vel_arr_z = self.Kp[2]*err_z
+
+			if vel_arr_z<self.min_step:
+				vel_arr_z = self.min_step
+
 			
+			err_yaw = -ref[-1] + current_abs_state[-1]
 			print("err = ", err[:3])
-			vel_arr = self.Kp*err
-			print("vel = ", vel_arr[:3])
-			vel.linear.x = -vel_arr[0]
-			vel.linear.y = vel_arr[1]
-			vel.linear.z = vel_arr[2]
+			vel_arr_yaw = self.Kp[-1]*err_x
 
-			vel.angular.x = vel_arr[3]
-			vel.angular.y = vel_arr[4]
-			vel.angular.z = vel_arr[5]
 
+			# print("vel = ", vel_arr[:3])
+
+			vel.linear.x = vel_arr_x
+			vel.linear.y = vel_arr_y
+			vel.linear.z = vel_arr_z
+
+			vel.angular.x = 0
+			vel.angular.y = 0
+			vel.angular.z = vel_arr_yaw
 			# print("angular z = ", vel.angular.z)
 			self.orient(vel)
 			# print("t = ",t)
 			# t+=dt
 			self.vel_pub_rate.sleep()
 
+		def iLikeToMoveItMoveIt(self):
+			ref = np.array([self.x_sp,self.y_sp,self.z_sp,self.yaw_sp])
+			while (not rospy.is_shutdown()):
+				self.move(ref)
+				print("moving")
 # def land_out():
 
 
 def main():
 	rospy.init_node('position_hold', anonymous=True)
 	pos_hld = moveit()
-	# pos_hld.takeoff()
+	pos_hld.takeoff()
 	time.sleep(3)
 	pos_hld.calculate_bias()
-	time.sleep(1)
-	#pos_hld.
+	time.sleep(2)
+	pos_hld.iLikeToMoveItMoveIt()
 	# pos_hld.xline()
 	# rospy.on_shutdown(pid.land())
 
