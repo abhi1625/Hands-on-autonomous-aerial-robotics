@@ -34,15 +34,15 @@ class moveit:
 		self.current_state = np.zeros((6,))
 		self.x_sp = 0
 		self.y_sp = 0
-		self.z_sp = 0
+		self.z_sp = 1
 		self.yaw_sp = 0
 		self.min_step = 0.0
 		self.max_step = 0.4
-		self.Kp = [0.05,0.05,0.08,0.0,0.0,0.01]
+		self.Kp = [0.02,0.03,0.1,0.0,0.0,0.04]
 
 
 	def cam_pose_cb(self,data):
-		print("campose cb", data.linear.x)
+		#print("ya campose", data.angular.z)
 		self.x_sp = data.linear.x
 		self.y_sp = data.linear.y
 		self.z_sp = data.linear.z
@@ -94,49 +94,48 @@ class moveit:
 
 		vel = Twist()
 		# dt = 0.1
-			# print("reference state = ", ref[:3])
-		while ((not rospy.is_shutdown())):
-			# print("current_state = ", abs_curr_state[:3])
-			# err = ref + abs_curr_state
+		# print("reference state = ", ref[:3])
+		# print("current_state = ", abs_curr_state[:3])
+		# err = ref + abs_curr_state
 
-			print("ref = ", ref)
-			current_abs_state = self.current_state - self.bias
-			print("biased compensated state",current_abs_state)
-			err_x = -ref[0] - current_abs_state[0]
-			vel_arr_x = self.Kp[0]*err_x
-			
-			print("vel x: ",vel_arr_x)		
-			err_y = ref[1] - current_abs_state[1]
-			vel_arr_y = self.Kp[1]*err_y
-			print("vel y",vel_arr_y)
-			err_z = ref[2] - current_abs_state[2]
-			vel_arr_z = self.Kp[2]*err_z
-                        
-			print("vel z: ",vel_arr_z)
-					
-			err_yaw = -ref[-1] + current_abs_state[-1]
-			#print("err = ", err[:3])
-			vel_arr_yaw = self.Kp[-1]*err_x
-			print("vel yaw",vel_arr_yaw)
-			# print("vel = ", vel_arr[:3])
+		print("ref = ", ref)
+		current_abs_state = self.current_state - self.bias
+		print("biased compensated state",current_abs_state[-1])
+		err_x = ref[0] - current_abs_state[0]
+		vel_arr_x = self.Kp[0]*err_x
+		
+		#print("vel x: ",vel_arr_x)		
+		err_y = -ref[1] - current_abs_state[1]
+		vel_arr_y = self.Kp[1]*err_y
+		#print("vel y",vel_arr_y)
+		err_z = ref[2] - current_abs_state[2]
+		vel_arr_z = self.Kp[2]*err_z
+		
+		#print("vel z: ",vel_arr_z)
+				
+		err_yaw = -ref[-1] + current_abs_state[-1]
+		#print("err_yaw = ", err_yaw)
+		vel_arr_yaw = self.Kp[-1]*err_yaw
+		#print("vel yaw",vel_arr_yaw)
+		#print("kp yaw = ", self.Kp[-1])
 
-			vel.linear.x = vel_arr_x
-			vel.linear.y = vel_arr_y
-			vel.linear.z = vel_arr_z
+		vel.linear.x = vel_arr_x
+		vel.linear.y = vel_arr_y
+		vel.linear.z = vel_arr_z
 
-			vel.angular.x = 0
-			vel.angular.y = 0
-			vel.angular.z = vel_arr_yaw
-			# print("angular z = ", vel.angular.z)
-			self.orient(vel)
-			# print("t = ",t)
-			# t+=dt
-			self.vel_pub_rate.sleep()
+		vel.angular.x = 0
+		vel.angular.y = 0
+		vel.angular.z = vel_arr_yaw
+		# print("angular z = ", vel.angular.z)
+		self.orient(vel)
+		# print("t = ",t)
+		# t+=dt
+		self.vel_pub_rate.sleep()
 
 	def iLikeToMoveItMoveIt(self):
-		ref = np.array([self.x_sp,self.y_sp,self.z_sp,self.yaw_sp])
 		while (not rospy.is_shutdown()):
-			print(ref)
+			#print(ref)
+			ref = np.array([self.x_sp,self.y_sp,self.z_sp,self.yaw_sp])
 			self.move(ref)
 			print("moving")
 # def land_out():
