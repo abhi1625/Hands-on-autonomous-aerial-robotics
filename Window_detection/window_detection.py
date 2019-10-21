@@ -25,8 +25,8 @@ class video_stream:
 		rospack = rospkg.RosPack()
 		pkg_path = rospack.get_path('noob_quaternions')
 		#print(pkg_path)
-		weights_path = pkg_path+'/src/drone-course/Window_detection/GMM/training_params/window_weights_4.npy'
-		params_path = pkg_path+'/src/drone-course/Window_detection/GMM/training_params/gaussian_params_4.npy'
+		weights_path = pkg_path+'/src/drone-course/Window_detection/GMM/training_params/window_weights_rgb_final.npy'
+		params_path = pkg_path+'/src/drone-course/Window_detection/GMM/training_params/gaussian_params_rgb_final.npy'
 		self.n, self.K, self.weights, self.params = loadparamsGMM(weights_path, params_path)
 
 	def img_callback(self, data):
@@ -316,9 +316,9 @@ class Window_detection:
 		# 	pass
 
 		#cv2.imshow('frame',original_img)
-		#cv2.imshow('frame1',houghlines)
-		#if cv2.waitKey(1) & 0xFF == ord('q'):
-		#	cv2.destroyAllWindows()
+		cv2.imshow('frame1',houghlines)
+		if cv2.waitKey(1) & 0xFF == ord('q'):
+			cv2.destroyAllWindows()
 		# masked_img = cv2.resize(img, (int(img.shape[1]/2), (int(img.shape[0]/2))))
 		cv_image = self.bridge.cv2_to_imgmsg(original_img, "bgr8")
 		self.window_image_pub.publish(cv_image)

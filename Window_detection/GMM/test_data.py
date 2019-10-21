@@ -114,7 +114,7 @@ def test_combined(test_image,K,n_factor,weights, parameters,color):
 	# test = np.uint8(probabilities*255/np.max(probabilities))
 	
 	# # probabilities[probabilities > np.max(probabilities)/80] = 0
-	probabilities[(probabilities > np.max(probabilities)/10)] = 255
+	probabilities[(probabilities > np.max(probabilities)/3)] = 255
 	# probabilities = cv2.resize(probabilities, (shape2, shape1))
 	# plt.imshow(probabilities)
 	# plt.show()

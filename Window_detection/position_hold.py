@@ -109,6 +109,27 @@ class moveit:
 				
 			self.bebop_vel_pub.publish(vel)
 
+	def move_up(self, height):
+		vel = Twist()
+		t = 0
+		dt = 0.1
+		while ((not rospy.is_shutdown()) and t <= height):
+
+			vel.linear.x = 0
+			vel.linear.y = 0
+			vel.linear.z = dt*1.5
+
+			vel.angular.x = 0
+			vel.angular.y = 0
+			vel.angular.z = 0
+
+			#print("angular z = ", vel.angular.z)
+			self.orient(vel)
+			#print("t = ",t)
+			t+=dt
+			self.bebop_vel_pub.publish(vel)
+
+
 
 	def move(self,ref):
 
@@ -169,7 +190,7 @@ class moveit:
 				print("curr = ",curr)
 				print("new ref = ",ref)
 				self.punch_through()
-			print("moving")
+			print("waiting for vision sp")
 # def land_out():
 
 
@@ -177,7 +198,9 @@ def main():
 	rospy.init_node('position_hold', anonymous=True)
 	pos_hld = moveit()
 	pos_hld.takeoff()
-	time.sleep(5)
+	time.sleep(4)
+	pos_hld.move_up(0.6)
+	time.sleep(2)
 	print("takeoff initiated")
 	pos_hld.calculate_bias()
 	time.sleep(2)
