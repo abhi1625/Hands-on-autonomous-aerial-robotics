@@ -6,7 +6,7 @@ import math
 import matplotlib.pyplot as plt
 import rospy
 import time
-from std_msgs.msg import Empty
+from std_msgs.msg import Empty, String
 from geometry_msgs.msg import Twist, Pose
 from nav_msgs.msg import Odometry
 # from GMM.test_data import *
@@ -20,7 +20,7 @@ class moveit:
 		self.bebop_vel_pub = rospy.Publisher('/bebop/cmd_vel', Twist, queue_size=10)
 		self.land_pub = rospy.Publisher('/bebop/land', Empty, queue_size=1 , latch=True)
 		self.cam_pose_sub = rospy.Subscriber('/relative_pose',Twist,self.cam_pose_cb)
-
+		self.vision_status_sub = rospy.Subscriber('/vision_status',String,self.vision_status_cb)
 		self.inFlight = False
 		self.pose = Pose()
 		# self.twist = Twist()
@@ -38,8 +38,11 @@ class moveit:
 		self.yaw_sp = 0
 		self.min_step = 0.0
 		self.max_step = 0.4
-		self.Kp = [0.02,0.03,0.1,0.0,0.0,0.04]
+		self.Kp = [0.02,0.03,0.3,0.0,0.0,0.04]
+		self.vision_status = "inactive"
 
+	def vision_status_cb(self,data):
+		self.vision_status = data.data
 
 	def cam_pose_cb(self,data):
 		#print("ya campose", data.angular.z)
@@ -90,6 +93,23 @@ class moveit:
 	# 		t+=dt
 	# 		self.vel_pub_rate.sleep()
 
+	def punch_through(self):
+		t = 0
+		dt = 0.1
+		vel = Twist()
+		while(t<1.3 or (not rospy.is_shutdown())):
+			vel.linear.x = dt
+			vel.linear.y = 0
+			vel.linear.z = 0
+				
+			vel.angular.x = 0
+			vel.angular.y = 0
+			vel.angular.z = 0
+			t += dt
+				
+			self.bebop_vel_pub.publish(vel)
+
+
 	def move(self,ref):
 
 		vel = Twist()
@@ -98,19 +118,19 @@ class moveit:
 		# print("current_state = ", abs_curr_state[:3])
 		# err = ref + abs_curr_state
 
-		print("ref = ", ref)
+		#print("ref = ", ref)
 		current_abs_state = self.current_state - self.bias
-		print("biased compensated state",current_abs_state[-1])
+		#print("biased compensated state",current_abs_state[2])
 		err_x = ref[0] - current_abs_state[0]
 		vel_arr_x = self.Kp[0]*err_x
 		
 		#print("vel x: ",vel_arr_x)		
-		err_y = -ref[1] - current_abs_state[1]
+		err_y = ref[1] - current_abs_state[1]
 		vel_arr_y = self.Kp[1]*err_y
-		#print("vel y",vel_arr_y)
+		#print("ref z= ",ref[2])
 		err_z = ref[2] - current_abs_state[2]
+		#print("err z= ",err_z)
 		vel_arr_z = self.Kp[2]*err_z
-		
 		#print("vel z: ",vel_arr_z)
 				
 		err_yaw = -ref[-1] + current_abs_state[-1]
@@ -133,10 +153,22 @@ class moveit:
 		self.vel_pub_rate.sleep()
 
 	def iLikeToMoveItMoveIt(self):
+		ref = np.array([self.x_sp,self.y_sp,self.z_sp,self.yaw_sp])
 		while (not rospy.is_shutdown()):
 			#print(ref)
-			ref = np.array([self.x_sp,self.y_sp,self.z_sp,self.yaw_sp])
-			self.move(ref)
+			curr = self.current_state - self.bias
+			if(self.vision_status == "active" or ref[0]>1):
+				print("update ref")
+				print("curr = ",curr)
+				print("prev ref = ",ref)
+				ref = np.array([self.x_sp+curr[0],self.y_sp+curr[1],curr[2]+self.z_sp,(-self.y_sp-curr[1])*0.1])
+				print("new ref = ",ref)
+				self.move(ref)
+			elif(ref[0]<=1.0 and ref[0] != 0.0):
+				print("punching")
+				print("curr = ",curr)
+				print("new ref = ",ref)
+				self.punch_through()
 			print("moving")
 # def land_out():
 
@@ -145,7 +177,8 @@ def main():
 	rospy.init_node('position_hold', anonymous=True)
 	pos_hld = moveit()
 	pos_hld.takeoff()
-	time.sleep(3)
+	time.sleep(5)
+	print("takeoff initiated")
 	pos_hld.calculate_bias()
 	time.sleep(2)
 	pos_hld.iLikeToMoveItMoveIt()
