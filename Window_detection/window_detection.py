@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import rospy
+import rospkg
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist 
@@ -21,8 +22,11 @@ class video_stream:
 		self.bridge = CvBridge()
 		self.image_sub = rospy.Subscriber("/image_raw", Image, self.img_callback)
 		self.window_detection = Window_detection()
-		weights_path = './GMM/training_params/window_weights_4.npy'
-		params_path = './GMM/training_params/gaussian_params_4.npy'
+		rospack = rospkg.RosPack()
+		pkg_path = rospack.get_path('noob_quaternions')
+		print(pkg_path)
+		weights_path = pkg_path+'/src/drone-course/Window_detection/GMM/training_params/window_weights_4.npy'
+		params_path = pkg_path+'/src/drone-course/Window_detection/GMM/training_params/gaussian_params_4.npy'
 		self.n, self.K, self.weights, self.params = loadparamsGMM(weights_path, params_path)
 
 	def img_callback(self, data):
@@ -141,8 +145,8 @@ class Window_detection:
 
 		_, rotVec, transVec = cv2.solvePnP(objPoints,imgPoints, camMatrix, distCoeffs)
 
-		print("rotation_vec: ",rotVec)
-		print("trans_vec: ", transVec)
+		#print("rotation_vec: ",rotVec)
+		#print("trans_vec: ", transVec)
 
 		# Verification by reporjecting points using rotation and 
 		# translation computed above
@@ -286,7 +290,7 @@ class Window_detection:
 				self.twist_obj.linear.y = -(transVec[0,0] + 41.0)/100 	#in m
 				self.twist_obj.linear.z = -(transVec[1,0] + 21.5)/100  	#in m
 				self.twist_obj.angular.z = -rotVec[1]
-
+				print("state x,y,z,yaw",self.twist_obj.linear.x,self.twist_obj.linear.y,self.twist_obj.linear.z,self.twist_obj.angular.z)
 				self.pose_pub.publish(self.twist_obj)
 				self.state_pub.publish("active")
 		else:
