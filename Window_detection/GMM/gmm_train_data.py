@@ -37,7 +37,11 @@ def getData(folder_name):
         print("frame processed")
         print("length of data stack: ", len(stack))
     
+<<<<<<< HEAD
     np.save('yellow_window_data_2.npy',stack)
+=======
+    np.save('yellow_window_data_100.npy',stack)
+>>>>>>> 16951e4772f3d9e51fe81f1557a0b34d002a42cc
     return np.array(stack)
 
 class GMM:
@@ -120,12 +124,24 @@ def plot_data_hist(data, name):
     plt.title("Histogram with 'auto' bins for "+name+ " channel")
     plt.show()  
 
+<<<<<<< HEAD
 # train_data = getData("./data/")
 train_data = np.load("yellow_window_data_2.npy")
 # print(train_data_1.shape)
 # train_data2 = np.load("yellow_window_data_25.npy")
 # train_data = np.concatenate([train_data_1,train_data2],axis=0)
 # print(train_data.shape)
+=======
+#train_data = getData("./mask_100")
+train_data_1 = np.load("yellow_window_data_2.npy")
+print(train_data_1.shape)
+#train_data2 = np.load("yellow_window_data_25.npy")
+train_data3 = np.load("yellow_window_data_50.npy")
+train_data4 = np.load("yellow_window_data_75.npy")
+train_data5 = np.load("yellow_window_data_100.npy")
+train_data = np.concatenate([train_data_1,train_data3,train_data4,train_data5],axis=0)
+print(train_data.shape)
+>>>>>>> 16951e4772f3d9e51fe81f1557a0b34d002a42cc
 
 plot_data_hist(train_data[:,0], "red")
 plot_data_hist(train_data[:,1], "green")
@@ -133,7 +149,13 @@ plot_data_hist(train_data[:,2], "blue")
 # input('a')
 
 gmm = GMM(train_data)
+<<<<<<< HEAD
 mix_c, parameters = gmm.GMM(4)
 print mix_c, parameters
 save_models(mix_c, './training_params/window_weights_4', parameters, './training_params/gaussian_params_4')
+=======
+mix_c, parameters = gmm.GMM(7)
+print mix_c, parameters
+save_models(mix_c, './training_params/window_weights_day_7', parameters, './training_params/gaussian_params_day_7')
+>>>>>>> 16951e4772f3d9e51fe81f1557a0b34d002a42cc
 

@@ -75,7 +75,7 @@ def main():
     # logging.basicConfig(format='%(levelname)s ''%(processName)-10s : %(asctime)s ','%(module)s.%(funcName)s:%(lineno)s %(message)s',level=logging.INFO)
 
     # load images
-    data_path  = '/home/abhinav/Gits/drone-course/drone_course_data/Window_detection/GMM/data/GMM_1/'
+    data_path  = '/home/pratique/drone-course/Window_detection/GMM/daylight_100'
     reply = 'k'
     i = 0
     for filename in os.listdir(data_path):
@@ -85,10 +85,11 @@ def main():
             continue
         img = cv2.imread(os.path.join(data_path,filename))
         # convert = tune_RGB(img)
-    	convert = tune_HSV(convert)
-    	convert = adjust_gamma(convert, gamma = 1.5)
+    	#convert = tune_HSV(img)
+    	convert = adjust_gamma(img, gamma = 1.5)
     	# convert = cv2.fastNlMeansDenoisingColored(convert, None, 3, 3, 7, 15)
-        # img = cv2.cvtColor(convert,cv2.COLOR_BGR2RGB)
+        convert = cv2.medianBlur(convert,5)
+        img = cv2.cvtColor(convert,cv2.COLOR_BGR2RGB)
         # Show the image
         # Show the image
         # img = img[:,:,[2,1,0]]
@@ -134,7 +135,7 @@ def main():
         extracted_frame = cv2.bitwise_and(img, img, mask = window_mask)
         extracted_frame = cv2.cvtColor(extracted_frame,cv2.COLOR_RGB2BGR)
         # input('aa')
-        cv2.imwrite("./data/window"+str(i)+".jpg", extracted_frame)
+        cv2.imwrite("./data/window_100"+str(i)+".jpg", extracted_frame)
         i = i+1
         if 0xFF == ord('q'):
             break
