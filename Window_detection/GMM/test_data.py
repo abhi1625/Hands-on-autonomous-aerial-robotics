@@ -113,9 +113,17 @@ def test_combined(test_image,K,n_factor,weights, parameters,color):
 	# print(probabilities.shape)
 	# test = np.uint8(probabilities*255/np.max(probabilities))
 	
+<<<<<<< HEAD
+	probabilities = np.reshape(likelihood,(nx,ny))
+	test = np.uint8(probabilities*255/np.max(probabilities))
+	
+	# probabilities[probabilities > np.max(probabilities)/80] = 0
+	probabilities[(probabilities > np.mean(probabilities)/n_factor)] = 255
+=======
 	# # probabilities[probabilities > np.max(probabilities)/80] = 0
 	probabilities[(probabilities > np.max(probabilities)/10)] = 255
 	# probabilities = cv2.resize(probabilities, (shape2, shape1))
+>>>>>>> 16951e4772f3d9e51fe81f1557a0b34d002a42cc
 	# plt.imshow(probabilities)
 	# plt.show()
 	# print("frame processed")
