@@ -38,7 +38,7 @@ class moveit:
 		self.yaw_sp = 0
 		self.min_step = 0.0
 		self.max_step = 0.4
-		self.Kp = [0.02,0.03,0.3,0.0,0.0,0.04]
+		self.Kp = [0.01,0.1,0.5,0.0,0.0,0.04]
 		self.vision_status = "inactive"
 
 	def vision_status_cb(self,data):
@@ -97,7 +97,7 @@ class moveit:
 		t = 0
 		dt = 0.1
 		vel = Twist()
-		while(t<1.3 or (not rospy.is_shutdown())):
+		while(t<2.0 or (not rospy.is_shutdown())):
 			vel.linear.x = dt
 			vel.linear.y = 0
 			vel.linear.z = 0
@@ -117,7 +117,7 @@ class moveit:
 
 			vel.linear.x = 0
 			vel.linear.y = 0
-			vel.linear.z = dt*1.5
+			vel.linear.z = dt*5.0
 
 			vel.angular.x = 0
 			vel.angular.y = 0
@@ -125,7 +125,7 @@ class moveit:
 
 			#print("angular z = ", vel.angular.z)
 			self.orient(vel)
-			#print("t = ",t)
+			print("t = ",t)
 			t+=dt
 			self.bebop_vel_pub.publish(vel)
 
@@ -152,6 +152,11 @@ class moveit:
 		err_z = ref[2] - current_abs_state[2]
 		#print("err z= ",err_z)
 		vel_arr_z = self.Kp[2]*err_z
+		#if(vel_arr_z>0.0 and vel_arr_z<0.2):
+		#	vel_arr_z = 0.2
+		
+		#if(vel_arr_z<0.0 and vel_arr_z>-0.2):
+		#	vel_arr_z = -0.2
 		#print("vel z: ",vel_arr_z)
 				
 		err_yaw = -ref[-1] + current_abs_state[-1]
@@ -178,14 +183,16 @@ class moveit:
 		while (not rospy.is_shutdown()):
 			#print(ref)
 			curr = self.current_state - self.bias
-			if(self.vision_status == "active" or ref[0]>1):
+			if(self.vision_status == "active" or ref[0]>2.5):
 				print("update ref")
 				print("curr = ",curr)
 				print("prev ref = ",ref)
-				ref = np.array([self.x_sp+curr[0],self.y_sp+curr[1],curr[2]+self.z_sp,(-self.y_sp-curr[1])*0.1])
+				ref = np.array([self.x_sp+curr[0],self.y_sp+curr[1],curr[2]-self.z_sp,(-self.y_sp-curr[1])*0.1])
 				print("new ref = ",ref)
 				self.move(ref)
-			elif(ref[0]<=1.0 and ref[0] != 0.0):
+				if(abs(curr[0])>0.5):
+					break
+			elif(ref[0]<=2.5 and ref[0] != 0.0):
 				print("punching")
 				print("curr = ",curr)
 				print("new ref = ",ref)
@@ -199,7 +206,7 @@ def main():
 	pos_hld = moveit()
 	pos_hld.takeoff()
 	time.sleep(4)
-	pos_hld.move_up(0.6)
+	pos_hld.move_up(20)
 	time.sleep(2)
 	print("takeoff initiated")
 	pos_hld.calculate_bias()
