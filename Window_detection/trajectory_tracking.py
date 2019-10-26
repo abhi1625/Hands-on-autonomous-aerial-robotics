@@ -224,7 +224,7 @@ class trajectory_track:
 		self.current_state[2] = data.pose.pose.position.z
 		self.current_state[3] = data.pose.pose.orientation.x
 		self.current_state[4] = data.pose.pose.orientation.y
-		self.current_state[5] = data.pose.pose.orientation.z
+		self.current_state[5] = data.twist.twist.angular.z*0.2 + self.current_state[5]
 
 		self.curr_vel_odom[0] = data.twist.twist.linear.x
 		self.curr_vel_odom[1] = data.twist.twist.linear.y 
@@ -325,9 +325,9 @@ def main():
 			
 		vel.angular.x = 0
 		vel.angular.y = 0
-		#vel.angular.z = 0.1*(yaw_reference - track_ob.current_state[5]) - 0.01*track_ob.curr_vel_yaw 
-		vel.angular.z = 0
-		print("vel x",vel.linear.x )
+		vel.angular.z = 1*(yaw_reference - track_ob.current_state[5])
+		# vel.angular.z = 
+		print("vel z",vel.linear.z )
 		print("vel y", vel.linear.y)
 		track_ob.bebop_vel_pub.publish(vel)
 		rate.sleep()
