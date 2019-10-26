@@ -9,7 +9,7 @@ import time
 from std_msgs.msg import Empty, String
 from geometry_msgs.msg import Twist, Pose
 from nav_msgs.msg import Odometry
-
+from bebop_msgs.msg import Ardrone3PilotingStateAttitudeChanged
 
 
 
@@ -198,7 +198,7 @@ class trajectory_track:
 		self.takeoff_pub = rospy.Publisher('/bebop/takeoff', Empty, queue_size=1 , latch=True)
 		self.bebop_vel_pub = rospy.Publisher('/bebop/cmd_vel', Twist, queue_size=10)
 		self.land_pub = rospy.Publisher('/bebop/land', Empty, queue_size=1 , latch=True)
-		
+		self.rotation_sub = rospy.Subscriber('/bebop/states/ardrone3/PilotingState/AttitudeChanged',Ardrone3PilotingStateAttitudeChanged, self.rot_callback)
 
 		self.current_state = np.zeros((6,))
 		self.prev_vel_odom = np.zeros((2,1))
@@ -222,14 +222,15 @@ class trajectory_track:
 		self.current_state[0] = data.twist.twist.linear.x*0.2 + self.current_state[0]
 		self.current_state[1] = data.twist.twist.linear.y*0.2 + self.current_state[1]
 		self.current_state[2] = data.pose.pose.position.z
-		self.current_state[3] = data.pose.pose.orientation.x
-		self.current_state[4] = data.pose.pose.orientation.y
-		self.current_state[5] = data.twist.twist.angular.z*0.2 + self.current_state[5]
 
 		self.curr_vel_odom[0] = data.twist.twist.linear.x
 		self.curr_vel_odom[1] = data.twist.twist.linear.y 
 		self.curr_vel_yaw = data.twist.twist.angular.z
 		# self.odom_data = data
+	def rot_callback(self, data):
+		self.current_state[3] = data.roll
+		self.current_state[4] = data.pitch
+		self.current_state[5] = data.yaw
 
 	def takeoff(self):
 		self.takeoff_pub.publish()
@@ -298,6 +299,7 @@ def main():
 	rospy.sleep(5)
 	init_flag = True
 	rate = rospy.Rate(10)
+	track_ob.next_des = np.array([1,1])
 	while (not rospy.is_shutdown()):
 		if init_flag :
 			bias_x = track_ob.current_state[0]
@@ -308,27 +310,37 @@ def main():
 			bias_ang_z = track_ob.current_state[5]
 
 			init_flag = False
-		#track_ob.current_state = track_ob.current_state - np.array([bias_x,bias_y,bias_z,bias_ang_x,bias_ang_y,bias_ang_z]) 
-		print("current x:",track_ob.current_state[0])
-		print("current y:",track_ob.current_state[1])
+		#track_ob.current_state[5] = track_ob.current_state[5] - bias_ang_z 
+		print("current z:",track_ob.current_state[5])
+		#print("current y:",track_ob.current_state[1])
 		#) print(track_ob.current_state)
-		track_ob.next_des = np.array([1,0])
+		if ((0.9 < track_ob.current_state[0] < 1.1) and (-0.1 < track_ob.current_state[1] < 0.1)):
+ 
+			track_ob.next_des = np.array([1,1])
+		
+		if ((0.9 < track_ob.current_state[0] < 1.1) and (0.9 < track_ob.current_state[1] < 1.1)):
+			track_ob.next_des = np.array([0,0])
 		l_parallel, l_perpendicular = track_ob.traj_gen()
-		yaw_reference = math.atan2(l_parallel[1], l_parallel[0])
-		#print("yaw reference",yaw_reference)
+		yaw_reference = math.atan2(l_parallel[1], l_parallel[0]) + bias_ang_z
+		if yaw_reference > math.pi:
+			yaw_reference = math.pi - yaw_reference
+		elif yaw_reference < -math.pi:
+			yaw_reference = -math.pi - yaw_reference
+		
+		print("yaw reference",yaw_reference)
 		track_ob.compute_states(l_parallel, l_perpendicular)	
 		ctrl_inputs = track_ob.compute_ctrl_inputs(l_parallel,l_perpendicular)
 		vel = Twist()
-		vel.linear.x = 1*ctrl_inputs[0]
-		vel.linear.y = 1*ctrl_inputs[1]
+		vel.linear.x = 0*ctrl_inputs[0]
+		vel.linear.y = 0*ctrl_inputs[1]
 		vel.linear.z = 0
 			
 		vel.angular.x = 0
 		vel.angular.y = 0
-		vel.angular.z = 1*(yaw_reference - track_ob.current_state[5])
+		vel.angular.z = 0.05*(yaw_reference - track_ob.current_state[5])
 		# vel.angular.z = 
-		print("vel z",vel.linear.z )
-		print("vel y", vel.linear.y)
+		print("vel z",vel.angular.z )
+		#print("vel y", vel.linear.y)
 		track_ob.bebop_vel_pub.publish(vel)
 		rate.sleep()
 
