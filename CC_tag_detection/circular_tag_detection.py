@@ -29,10 +29,32 @@ class BullsEyeDetection:
 					np_lines = np.delete(np_lines,i-count,0)
 					count +=1
 			group = group[1:,:]
-			group_mean = np.median(group,axis = 0)
+			group_mean = np.mean(group,axis = 0)
 
 			line_clusters.append(group_mean)
 		return np.array(line_clusters)
+
+	def augment_lines(self,line_clusters):
+		rho_arr = line_clusters[:,0]
+		i_max = int(np.where(rho_arr == np.amax(rho_arr))[0])
+		i_min = int(np.where(rho_arr == np.amin(rho_arr))[0])
+
+		max_line = line_clusters[i_max]
+		min_line = line_clusters[i_min]
+		line_clusters = np.delete(line_clusters,i_max,0)
+		line_clusters = np.delete(line_clusters,i_min-1,0)
+		rho_arr = np.delete(rho_arr,i_max,0)
+		rho_arr = np.delete(rho_arr,i_min-1,0)
+		i_max_2 = int(np.where(rho_arr == np.amax(rho_arr))[0])
+		i_min_2 = int(np.where(rho_arr == np.amin(rho_arr))[0])
+		sec_max_line = line_clusters[i_max_2]
+		sec_min_line = line_clusters[i_min_2]
+		sec_max_line[0] = sec_max_line[0]+2
+		max_line[0] = max_line[0]-2
+		sec_min_line[0] = sec_min_line[0]-2
+		min_line[0] = min_line[0]+2
+		line_clusters = [max_line,sec_max_line,sec_min_line,min_line]
+		return line_clusters
 
 	def get_hough_lines(self,edges):
 		kernel = np.ones((2,2),np.uint8)
@@ -41,36 +63,48 @@ class BullsEyeDetection:
 		cv2.waitKey(0)
 		cv2.destroyAllWindows()
 		lines = cv2.HoughLines(edges,1,np.pi/120,40)
-		print("lines shape",lines.shape)
 		lines = np.squeeze(lines)
 		edges3CH = np.dstack((edges,edges,edges))
 		np_lines=np.array(lines)
-		print ("nplines shape",np_lines.shape)
-		# print("firstelem = ",np_lines[0,1])
+
 		line_clusters = self.get_line_clusters(np_lines,20,0.3)
-		print ("meaningful_lines",line_clusters)
-		rho_arr = line_clusters[:,0]
-		print("max rho = ", np.amax(rho_arr))
-		print("min rho = ", np.amin(rho_arr))
-		i=0
-		for rho,theta in line_clusters:
-			rho = rho+1
+
+		mod_line_cluster = self.augment_lines(line_clusters)
+		# print ("mod_line_cluster",mod_line_cluster)
+		rect_line = np.zeros((1,2))
+		
+		# print line_clusters
+		for rho,theta in mod_line_cluster:
+			# rho = rho+1
 			a = np.cos(theta)
 			b = np.sin(theta)
+			##### convert line from polar coordinates to cartesian coordinattes
+			slope = -a/b
+			intercept = rho/b
+			# print("intercept, slope = ",intercept,slope)
+			rect_line = np.vstack((rect_line,np.array([intercept,slope])))
 			x0 = a*rho
 			y0 = b*rho
 			x1 = int(x0 + 1000*(-b))
 			y1 = int(y0 + 1000*(a))
 			x2 = int(x0 - 1000*(-b))
 			y2 = int(y0 - 1000*(a))
-			if i == 3 :
-				cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
-				print("rho = ",rho)
-				print("theta = ",theta)
-			i+=1
+			cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
+		rect_line = rect_line[1:,:]
+		# print ("rect_line",rect_line)
 		cv2.imshow('edges3CH', edges3CH)
 		cv2.waitKey(0)
 		cv2.destroyAllWindows()
+
+		return rect_line
+
+	def refine_contours(self,img,rect_line):
+		intercept,slope = rect_line[0]
+		h,w = img.shape
+		mesh = np.mgrid[0:h,0:w]
+		print ("mesh shape = ", mesh.shape)
+		# img[img[:,0]+img[0,:]*slope-intercept]
+		return None
 
 	def detect_ellipse_fitellipse(self,img):
 		gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
@@ -92,34 +126,6 @@ class BullsEyeDetection:
 		orthogonal_thresh =0.5
 
 		if(lines is not None):
-			# rho_arr= np.zeros((1,),dtype=float)
-			# print("lines shape",lines.shape)
-			# lines = np.squeeze(lines)
-			# rho_arr = lines[:,1]
-			# clusters = []
-			# while rho_arr is not None:
-			# 	k1 = []
-			# 	comp = rho_arr[0]
-			# 	for each in rho_arr:
-
-
-
-			# print("lines shape",lines.shape)
-			# for rho,theta in lines:
-			# 	print("angle = ", theta)
-			# 	a = np.cos(theta)
-			# 	b = np.sin(theta)
-			# 	x0 = a*rho
-			# 	y0 = b*rho
-			# 	x1 = int(x0 + 1000*(-b))
-			# 	y1 = int(y0 + 1000*(a))
-			# 	x2 = int(x0 - 1000*(-b))
-			# 	y2 = int(y0 - 1000*(a))
-
-			# 	cv2.line(img,(x1,y1),(x2,y2),(0,0,255),2)
-			# 	cv2.imshow('edges', img)
-			# 	cv2.waitKey(0)
-			# 	cv2.destroyAllWindows()
 		
 			i,contours,h = cv2.findContours(dilated_edges,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
 			# print("h = ", h)
@@ -162,18 +168,18 @@ class BullsEyeDetection:
 						# cv2.waitKey(0)
 						# cv2.destroyAllWindows()
 						count+=1
-			contours_img = img.copy()
+			# contours_img = img.copy()
 			stencil = np.zeros(edges.shape).astype(edges.dtype)
 			color = [255, 255, 255]
 			cv2.fillPoly(stencil, contours[iter_], color)
 			# result = cv2.bitwise_xor(edges, stencil)
 			# cv2.drawContours(stencil, contours[iter_], -1, (0,255,0), 2)
-			cv2.imshow('stencil', stencil)
-			cv2.waitKey(0)
-			cv2.destroyAllWindows()
-			self.get_hough_lines(stencil)
-			
-		# # cv2.drawContours(img, c1, -1, (0,255,0), 2)
+			# cv2.imshow('stencil', stencil)
+			# cv2.waitKey(0)
+			# cv2.destroyAllWindows()
+			houg_lines = self.get_hough_lines(stencil)
+			refined_contours = self.refine_contours(edges,houg_lines)
+
 
 
 	def detect_ellipse_hough(self,img):
