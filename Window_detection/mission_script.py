@@ -153,15 +153,22 @@ def main():
 		print("current z:",track_ob.current_state[5])
 		#print("current y:",track_ob.current_state[1])
 		#) print(track_ob.current_state)
+		l_parallel, l_perpendicular = track_ob.traj_gen()
+		yaw_reference = math.atan2(l_parallel[1], l_parallel[0]) + bias_ang_z
+		if yaw_reference > math.pi:
+			yaw_reference = math.pi - yaw_reference
+		elif yaw_reference < -math.pi:
+			yaw_reference = -math.pi - yaw_reference
+		
+		track_ob.compute_states(l_parallel, l_perpendicular)	
+		ctrl_inputs = track_ob.compute_ctrl_inputs(l_parallel,l_perpendicular)
+		track_ob.bebop_vel_pub.publish(vel)
 		vel.linear.x = 1.5*ctrl_inputs[0]
 		vel.linear.y = 1.5*ctrl_inputs[1]
 		vel.linear.z = 0	
 		vel.angular.x = 0
 		vel.angular.y = 0
 		vel.angular.z = 0.05*(yaw_reference - track_ob.current_state[5])
-		track_ob.compute_states(l_parallel, l_perpendicular)	
-		ctrl_inputs = track_ob.compute_ctrl_inputs(l_parallel,l_perpendicular)
-		track_ob.bebop_vel_pub.publish(vel)
 
 		if ((0.9 < track_ob.current_state[0] < 1.1) and (-0.1 < track_ob.current_state[1] < 0.1)):
 			#increase z
@@ -188,13 +195,6 @@ def main():
 			vel.linear.z = 0.0
 			track_ob.next_des = np.array([x_detection, y_detection])
 			
-		l_parallel, l_perpendicular = track_ob.traj_gen()
-		yaw_reference = math.atan2(l_parallel[1], l_parallel[0]) + bias_ang_z
-		if yaw_reference > math.pi:
-			yaw_reference = math.pi - yaw_reference
-		elif yaw_reference < -math.pi:
-			yaw_reference = -math.pi - yaw_reference
-		
 		print("yaw reference",yaw_reference)
 		
 		# vel.angular.z = 
