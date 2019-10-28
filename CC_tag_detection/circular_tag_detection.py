@@ -35,6 +35,7 @@ class BullsEyeDetection:
 		return np.array(line_clusters)
 
 	def augment_lines(self,line_clusters):
+		
 		rho_arr = line_clusters[:,0]
 		i_max = int(np.where(rho_arr == np.amax(rho_arr))[0])
 		i_min = int(np.where(rho_arr == np.amin(rho_arr))[0])
@@ -49,74 +50,104 @@ class BullsEyeDetection:
 		i_min_2 = int(np.where(rho_arr == np.amin(rho_arr))[0])
 		sec_max_line = line_clusters[i_max_2]
 		sec_min_line = line_clusters[i_min_2]
-		sec_max_line[0] = sec_max_line[0]+2
-		max_line[0] = max_line[0]-2
-		sec_min_line[0] = sec_min_line[0]-2
-		min_line[0] = min_line[0]+2
+		sec_max_line[0] = sec_max_line[0]+3
+		max_line[0] = max_line[0]-3
+		sec_min_line[0] = sec_min_line[0]-3
+		min_line[0] = min_line[0]+3
 		line_clusters = [max_line,sec_max_line,sec_min_line,min_line]
+		
 		return line_clusters
 
 	def get_hough_lines(self,edges):
 		kernel = np.ones((2,2),np.uint8)
 		edges = cv2.dilate(edges,kernel,iterations = 1)
-		cv2.imshow('dilated edges in hough', edges)
-		cv2.waitKey(0)
-		cv2.destroyAllWindows()
+		# cv2.imshow('dilated edges in hough', edges)
+		# cv2.waitKey(0)
+		# cv2.destroyAllWindows()
 		lines = cv2.HoughLines(edges,1,np.pi/120,40)
 		lines = np.squeeze(lines)
 		edges3CH = np.dstack((edges,edges,edges))
 		np_lines=np.array(lines)
+		status = False
+		line_clusters = self.get_line_clusters(np_lines,25,0.3)
+		if(line_clusters.shape[0]>=4):
+			mod_line_cluster = self.augment_lines(line_clusters)
 
-		line_clusters = self.get_line_clusters(np_lines,20,0.3)
+			# print ("mod_line_cluster",mod_line_cluster)
+			rect_line = np.zeros((1,2))
+			
+			# print line_clusters
+			for rho,theta in mod_line_cluster:
+				# rho = rho+1
+				a = np.cos(np.float(theta))
+				b = np.sin(np.float(theta))
+				##### convert line from polar coordinates to cartesian coordinattes
+				slope = -a/b
+				intercept = rho/b
+				# print("intercept, slope = ",intercept,slope)
+				rect_line = np.vstack((rect_line,np.array([intercept,slope])))
+				x0 = a*rho
+				y0 = b*rho
+				x1 = int(x0 + 1000*(-b))
+				y1 = int(y0 + 1000*(a))
+				x2 = int(x0 - 1000*(-b))
+				y2 = int(y0 - 1000*(a))
+				cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
+			rect_line = rect_line[1:,:]
+			# print ("rect_line",rect_line)
+			cv2.imshow('edges3CH', edges3CH)
+			cv2.waitKey(0)
+			cv2.destroyAllWindows()
+			status = True
+			return status,rect_line
+		else:
+			status = False
+			return status,lines
 
-		mod_line_cluster = self.augment_lines(line_clusters)
-		# print ("mod_line_cluster",mod_line_cluster)
-		rect_line = np.zeros((1,2))
-		
-		# print line_clusters
-		for rho,theta in mod_line_cluster:
-			# rho = rho+1
-			a = np.cos(theta)
-			b = np.sin(theta)
-			##### convert line from polar coordinates to cartesian coordinattes
-			slope = -a/b
-			intercept = rho/b
-			# print("intercept, slope = ",intercept,slope)
-			rect_line = np.vstack((rect_line,np.array([intercept,slope])))
-			x0 = a*rho
-			y0 = b*rho
-			x1 = int(x0 + 1000*(-b))
-			y1 = int(y0 + 1000*(a))
-			x2 = int(x0 - 1000*(-b))
-			y2 = int(y0 - 1000*(a))
-			cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
-		rect_line = rect_line[1:,:]
-		# print ("rect_line",rect_line)
-		cv2.imshow('edges3CH', edges3CH)
-		cv2.waitKey(0)
-		cv2.destroyAllWindows()
-
-		return rect_line
 
 	def refine_contours(self,img,rect_line):
-		intercept,slope = rect_line[0]
 		h,w = img.shape
 		mesh = np.mgrid[0:h,0:w]
-		print ("mesh shape = ", mesh.shape)
-		# img[img[:,0]+img[0,:]*slope-intercept]
-		return None
+		# print ("mesh shape = ", mesh.shape)
+		rows = mesh[0,:,:]
+		cols = mesh[1,:,:]
+		# print("row and col shape", rows.shape, cols.shape)
+		for i,[intercept,slope] in enumerate(rect_line):
+			if(i == 0):
+				img[rows-slope*cols-intercept>0] = 0
+			if(i == 1):
+				img[rows-slope*cols-intercept<0] = 0
+			if(i == 2):
+				img[rows-slope*cols-intercept>0] = 0
+			if(i == 3):
+				img[rows-slope*cols-intercept<0] = 0
+			
+		# intercept0,slope0 = rect_line[0]
+		# intercept1,slope1 = rect_line[1]
+		# intercept2,slope2 = rect_line[2]
+		# intercept3,slope3 = rect_line[3]
+		
+		# cv2.imshow('removed rectangle', img)
+		# cv2.waitKey(0)
+		# cv2.destroyAllWindows()
+		return img
 
 	def detect_ellipse_fitellipse(self,img):
 		gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+		# cle = cv2.createCLAHE(clipLimit = 5.0,tileGridSize =(8,8))
+		# gray = cle.apply(gray)
+		# cv2.imshow('contrast corrected', gray)
+		# cv2.waitKey(0)
+		# cv2.destroyAllWindows()
 		max_val = np.amax(gray)
 		rand_thresh = gray.copy()
 		rand_thresh[rand_thresh[:]<(max_val*self.thresh)] = 0 
 		edges = cv2.Canny(rand_thresh,50,150,apertureSize = 3)
 		kernel = np.ones((2,2),np.uint8)
 		dilated_edges = cv2.dilate(edges,kernel,iterations = 1)
-		cv2.imshow('edges', dilated_edges)
-		cv2.waitKey(0)
-		cv2.destroyAllWindows()
+		# cv2.imshow('edges', dilated_edges)
+		# cv2.waitKey(0)
+		# cv2.destroyAllWindows()
 		
 		# minLineLength = 40
 		# maxLineGap = 100
@@ -132,9 +163,6 @@ class BullsEyeDetection:
 			max_w = 0
 			max_h = 0
 			iter_ = -1
-			scnd_max_w = 0
-			scnd_max_h = 0
-			scnd_iter_ = -1
 			count = 0
 			print("contours",np.shape(contours))
 			for i,c1 in enumerate(contours):
@@ -145,28 +173,12 @@ class BullsEyeDetection:
 
 				if len(c1)>4 and (we > 10 and he > 10):
 						if he>max_h or we>max_w:
-							scnd_max_w = max_w
-							scnd_max_h = max_h
-							scnd_iter_ = iter_
-
 							max_h = he
 							max_w = we
 							iter_=i
-						elif(he>scnd_max_h and we>scnd_max_w):
-							scnd_max_w = we
-							scnd_max_h = he
-							scnd_iter_ = i
 
-						(cx,cy),(Ma,ma),th = cv2.fitEllipse(c1)
+						# (cx,cy),(Ma,ma),th = cv2.fitEllipse(c1)
 						# print("ellipse = ",(cx,cy),(Ma,ma),th)
-						# if iter_ == 855:
-						#     print c1.shape
-						# cv2.drawContours(img, c1, -1, (0,255,0), 2)
-								# continue
-						# print ("ellipse",ellipse)
-						# cv2.imshow('drawContours', img)
-						# cv2.waitKey(0)
-						# cv2.destroyAllWindows()
 						count+=1
 			# contours_img = img.copy()
 			stencil = np.zeros(edges.shape).astype(edges.dtype)
@@ -177,8 +189,41 @@ class BullsEyeDetection:
 			# cv2.imshow('stencil', stencil)
 			# cv2.waitKey(0)
 			# cv2.destroyAllWindows()
-			houg_lines = self.get_hough_lines(stencil)
-			refined_contours = self.refine_contours(edges,houg_lines)
+			hough_status,houg_lines = self.get_hough_lines(stencil)
+			if(hough_status):
+				refined_contours = self.refine_contours(edges,houg_lines)
+				
+				cv2.imshow('refined contours', refined_contours)
+				cv2.waitKey(0)
+				cv2.destroyAllWindows()
+
+				_,contours,h = cv2.findContours(refined_contours,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
+				# print("h = ", h)
+				max_w = 0
+				max_h = 0
+				iter_ = -1
+				count = 0
+				for i,c1 in enumerate(contours):
+					(x,y,we,he) = cv2.boundingRect(c1)
+					# print("bb params = ",x,y,we,he)
+
+					if len(c1)>4 and (we > 10 and he > 10):
+							if he>max_h or we>max_w:
+								max_h = he
+								max_w = we
+								iter_=i
+
+				# fit ellipse now
+				(cx,cy),(Ma,ma),th = cv2.fitEllipse(contours[iter_])
+				cv2.drawContours(img, contours[iter_], -1, (0,255,0), 2)
+
+				cv2.imshow('outer ellipse', img)
+				cv2.waitKey(0)
+				cv2.destroyAllWindows()
+				print("ellipse = ",(cx,cy),(Ma,ma),th)
+
+			else:
+				print("unable to refine")
 
 
 
@@ -196,12 +241,12 @@ class BullsEyeDetection:
 		# eroded_img = cv2.erode(rand_thresh,kernel,iterations = 1)
 		# edges = cv2.Canny(gray,120,200,apertureSize = 3)
 		eroded_img = rand_thresh
-		cv2.imshow('edges', rand_thresh)
-		cv2.waitKey(0)
-		cv2.destroyAllWindows()
-		cv2.imshow('eroded', eroded_img)
-		cv2.waitKey(0)
-		cv2.destroyAllWindows()
+		# cv2.imshow('edges', rand_thresh)
+		# cv2.waitKey(0)
+		# cv2.destroyAllWindows()
+		# cv2.imshow('eroded', eroded_img)
+		# cv2.waitKey(0)
+		# cv2.destroyAllWindows()
 		img_three = eroded_img.copy()
 		img_three = np.dstack((img_three,eroded_img,eroded_img))
 		print("3d img shape = ",img_three.shape)
@@ -225,9 +270,9 @@ class BullsEyeDetection:
 				    cv2.circle(img_three,(i[0],i[1]),i[2],(0,255,0),2)
 				    # draw the center of the circle
 				    cv2.circle(img_three,(i[0],i[1]),2,(0,0,255),3)
-			cv2.imshow('circles', img_three)
-			cv2.waitKey(0)
-			cv2.destroyAllWindows()
+			# cv2.imshow('circles', img_three)
+			# cv2.waitKey(0)
+			# cv2.destroyAllWindows()
 			# input("ad")
 			max_w = 0
 			max_h = 0
