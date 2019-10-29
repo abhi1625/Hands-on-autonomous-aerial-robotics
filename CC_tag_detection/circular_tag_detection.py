@@ -9,12 +9,31 @@ import numpy as np
 import math
 import copy
 import os
+import rospy
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+from geometry_msgs.msg import Twist,Pose
+from cv_bridge import CvBridge, CvBridgeError
 
 class BullsEyeDetection:
 	def __init__(self):
                 self.data_path = '/home/pratique/drone_course_data/CC_tag_detection'
                 self.thresh = 0.8
+                self.tag_rad = 0.2075    #m
+                self.image_sub = rospy.Subscriber("/image_raw", Image, self.img_callback)
+                self.pose_pub = rospy.Publisher("/cctag_sp", Twist, queue_size = 1)
+                self.image = None
+                self.pose_obj = Pose()
 
+
+
+	def img_callback(self, data):
+		try:
+			self.image = self.bridge.imgmsg_to_cv2(data, "bgr8")
+			# print('got frame')
+		except CvBridgeError as e:
+			print(e)
+		
 	def get_line_clusters(self,np_lines,rho_thresh,theta_thresh):
 		line_clusters = []
 		while(np_lines.shape[0] != 0):
@@ -95,9 +114,9 @@ class BullsEyeDetection:
 				cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
 			rect_line = rect_line[1:,:]
 			# print ("rect_line",rect_line)
-			cv2.imshow('edges3CH', edges3CH)
-			cv2.waitKey(0)
-			cv2.destroyAllWindows()
+			# cv2.imshow('edges3CH', edges3CH)
+			# cv2.waitKey(1)
+			# cv2.destroyAllWindows()
 			status = True
 			return status,rect_line
 		else:
@@ -131,6 +150,39 @@ class BullsEyeDetection:
 		# cv2.waitKey(0)
 		# cv2.destroyAllWindows()
 		return img
+
+	def pnp(self, imgPoints,img):
+		h,w = img.shape[:2]
+		# World coordinates using window measurement in world
+		objPoints = np.array([[-self.tag_rad,0,0],\
+									[0,self.tag_rad,0],\
+									[self.tag_rad,0,0], \
+									[0,-self.tag_rad,0]], dtype=np.float64)
+
+		# Camera K matrix(intrinsic params)
+		camMatrix = np.array([[103.97, 0 , 208.105],[0, 103.97, 114.713],[0,0,1]],dtype=np.float64)
+
+		#distortion coefficients 
+		distCoeffs = np.array([0,0,0,0,0],dtype=np.float64)
+
+		_, rotVec, transVec = cv2.solvePnP(objPoints,imgPoints, camMatrix, distCoeffs)
+
+		# Verification by reporjecting points using rotation and 
+		# translation computed above
+		reprojPoints,_ = cv2.projectPoints(objPoints, rotVec, transVec, camMatrix, distCoeffs)
+		reprojPoints = np.squeeze(reprojPoints)
+		# print(reprojPoints.shape)
+
+		for i in range(4):
+		        pt = reprojPoints[i]
+		        imgpt = imgPoints[i]
+		        cv2.circle(img, (int(pt[0]), int(pt[1])),5,[255,0,0],-1)
+		        # cv2.circle(img, (int(imgpt[0]),int(imgpt[1])),5,[0,255,0],-1)
+		cv2.imshow('reprojected',img)
+		cv2.waitKey(1)
+		cv2.destroyAllWindows()
+
+		return rotVec,transVec
 
 	def detect_ellipse_fitellipse(self,img):
 		gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
@@ -193,9 +245,9 @@ class BullsEyeDetection:
 			if(hough_status):
 				refined_contours = self.refine_contours(edges,houg_lines)
 				
-				cv2.imshow('refined contours', refined_contours)
-				cv2.waitKey(0)
-				cv2.destroyAllWindows()
+				# cv2.imshow('refined contours', refined_contours)
+				# cv2.waitKey(1)
+				# cv2.destroyAllWindows()
 
 				_,contours,h = cv2.findContours(refined_contours,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
 				# print("h = ", h)
@@ -215,12 +267,45 @@ class BullsEyeDetection:
 
 				# fit ellipse now
 				(cx,cy),(Ma,ma),th = cv2.fitEllipse(contours[iter_])
+				th = math.radians(th)
 				cv2.drawContours(img, contours[iter_], -1, (0,255,0), 2)
 
-				cv2.imshow('outer ellipse', img)
-				cv2.waitKey(0)
-				cv2.destroyAllWindows()
-				print("ellipse = ",(cx,cy),(Ma,ma),th)
+				print("ellipse = ",(cx,cy),(ma,Ma),th)
+				# cv2.imshow('outer ellipse', img)
+				# cv2.waitKey(0)
+				# cv2.destroyAllWindows()
+				pts_src = np.array([[-self.tag_rad,0],\
+									[0,self.tag_rad],\
+									[self.tag_rad,0], \
+									[0,-self.tag_rad]])
+				pts_dst = np.array([[cx - Ma*np.cos(th)/2,cy - Ma*np.sin(th)/2],\
+									[cx - ma*np.sin(th)/2, cy + ma*np.cos(th)/2],\
+									[cx + Ma*np.cos(th)/2,cy + Ma*np.sin(th)/2],\
+									[cx + ma*np.sin(th)/2,cy - ma*np.cos(th)/2]])
+				# print("pts_dst",pts_dst)
+
+				# H,status_h = cv2.findHomography(pts_src,pts_dst)
+				im_dst = np.zeros((240,320,3))
+				# H[0,2] = 0
+				# H[1,2] = 0
+				# print("H = ",H)
+
+				# print("im_dst size",im_dst.shape[1],im_dst.shape[0])
+				# im_out = cv2.warpPerspective(img, H, (im_dst.shape[1],im_dst.shape[0]))
+				rot,trans = self.pnp(pts_dst,img)
+				print("transVec = ", trans)
+				self.pose_obj.position.x = trans[0,0]			#in m
+				self.pose_obj.position.y = trans[1,0] 	#in m
+				self.pose_obj.position.z = trans[2,0]  	#in m
+				self.pose_obj.orientation.x = 0
+				self.pose_obj.orientation.y = 0
+				self.pose_obj.orientation.z = 0
+
+				# print("state x,y,z",self.pose_obj.position.x,self.pose_obj.position.y,self.pose_obj.position.z)
+				self.pose_pub.publish(self.pose_obj)
+				# cv2.imshow("warped img",im_out)
+				# cv2.waitKey(0)
+				# cv2.destroyAllWindows()
 
 			else:
 				print("unable to refine")
@@ -286,25 +371,31 @@ class BullsEyeDetection:
 		# cv2.destroyAllWindows()
 
 	def run_pipeline(self):
-		dirname = sorted(os.listdir(self.data_path))
-		for filename in dirname:
-		    #print("filename",filename)
-		    #print(os.path.join(self.data_path,filename))
-		    img = cv2.imread(os.path.join(self.data_path,filename))
-		    #cv2.imshow("read img",img)
-		#cv2.waitKey(0)
-		#cv2.destroyAllWindows()
-		    h,w,_ = img.shape
-		    #dim = (w/4,h/4)
-		    #img = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
-		    # print("img size = ",img.shape)
-		    # self.detect_ellipse_hough(img)
-		    self.detect_ellipse_fitellipse(img)
+		# dirname = sorted(os.listdir(self.data_path))
+		# for filename in dirname:
+		#     #print("filename",filename)
+		#     #print(os.path.join(self.data_path,filename))
+		#     img = cv2.imread(os.path.join(self.data_path,filename))
+		#     #cv2.imshow("read img",img)
+		# #cv2.waitKey(0)
+		# #cv2.destroyAllWindows()
+		#     h,w,_ = img.shape
+		#     #dim = (w/4,h/4)
+		#     #img = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
+		#     # print("img size = ",img.shape)
+		#     # self.detect_ellipse_hough(img)
+		if self.image is not None:
+			self.detect_ellipse_fitellipse(self.image)
+		else:
+			print("No image published")
 
 
 def main():
+		rospy.init_node('image_reader', anonymous=True)
 		ob = BullsEyeDetection()
-		ob.run_pipeline()
+		while(not rospy.is_shutdown()):
+			ob.run_pipeline()
+			# rospy.spin()
 
 
 if __name__ == '__main__':
