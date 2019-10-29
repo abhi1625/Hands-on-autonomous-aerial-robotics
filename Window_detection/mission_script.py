@@ -18,6 +18,8 @@ class trajectory_track:
 		self.bebop_vel_pub = rospy.Publisher('/bebop/cmd_vel', Twist, queue_size=10)
 		self.land_pub = rospy.Publisher('/bebop/land', Empty, queue_size=1 , latch=True)
 		self.rotation_sub = rospy.Subscriber('/bebop/states/ardrone3/PilotingState/AttitudeChanged',Ardrone3PilotingStateAttitudeChanged, self.rot_callback)
+		self.target_sub = rospy.Subscriber('/cctag_sp', Pose, self.pose_cb)
+		self.target_sp = Pose()
 
 		self.current_state = np.zeros((6,))
 		self.prev_vel_odom = np.zeros((2,1))
@@ -33,6 +35,8 @@ class trajectory_track:
 		self.vel_parallel = np.zeros((2,1))
 		self.acc_parallel = np.zeros((2,1))
 
+	def pose_cb(self,data):
+		self.target_sp = data
 
 	def odom_callback(self, data):
 		# self.pose = data.pose.pose
@@ -140,6 +144,7 @@ def main():
 	y_detection = 0.5
 	vel = Twist()
 	while (not rospy.is_shutdown()):
+		print(track_ob.target_sp)
 		if init_flag :
 			bias_x = track_ob.current_state[0]
 			bias_y = track_ob.current_state[1]
