@@ -29,7 +29,7 @@ class trajectory_track:
 		self.curr_vel_yaw = 0.0 
 		# current and previous position in x-y
 		self.x_coord = 4.0
-		self.y_coord = -2.8
+		self.y_coord = -1.9
 		self.next_des = np.array([self.x_coord, self.y_coord])
 		self.prev_des = np.zeros((2,))
 		
@@ -218,6 +218,7 @@ def main():
 			y_detection = pos_quad[1,0]
 			track_ob.next_des = np.array([pos_quad[0,0], pos_quad[1,0]])
 			mission1 = False
+			mission2 = True
 			# detect and align (x,y) with circle center
 			
 			# track_ob.next_des = np.array([track_ob.target[0], track_ob.target[1])
@@ -232,14 +233,16 @@ def main():
 				track_ob.bebop_vel_pub.publish(vel)
 			rospy.sleep(2)
 			pos_quad = track_ob.frame_transform(track_ob.target)
-			x_detection = pos_quad[0,0]
-			y_detection = pos_quad[1,0]
+			x_detection2 = pos_quad[0,0]
+			y_detection2 = pos_quad[1,0]
 			track_ob.next_des = np.array([pos_quad[0,0], pos_quad[1,0]])
 			mission3 = True
 			mission2 = False
 
-		if (mission3 and (track_ob.x_coord-0.05 < track_ob.current_state[0] < track_ob.x_coord+0.05) and (track_ob.y_coord-0.05< track_ob.current_state[1] < track_ob.y_coord+0.05)):		
+		if (mission3 and (x_detection2-0.05 < track_ob.current_state[0] < x_detection2+0.05) and (y_detection2-0.05< track_ob.current_state[1] < y_detection2+0.05)):		
 			vel.linear.z = 0.0
+			vel.linear.x = 2*ctrl_inputs[0]
+			vel.linear.y = 5*ctrl_inputs[1]
 			#track_ob.next_des = np.array([x_detection, y_detection])
 			print("Landing")
 			rospy.sleep(2)	

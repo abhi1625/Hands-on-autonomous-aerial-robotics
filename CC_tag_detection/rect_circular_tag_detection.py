@@ -456,7 +456,7 @@ class BullsEyeDetection:
 			else:
 				print("No image published")
 			center_mean= np.mean(self.centers,axis = 0)
-			self.pose_obj.position.x = center_mean[0]/100			#in m
+			self.pose_obj.position.x = (center_mean[0]/100) + 0.5			#in m
 			self.pose_obj.position.y = center_mean[1]/100
 			self.pose_pub.publish(self.pose_obj)
 		else:
