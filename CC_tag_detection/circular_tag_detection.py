@@ -21,19 +21,20 @@ class BullsEyeDetection:
 		self.thresh = 0.8
 		self.tag_rad = 0.2075    #m
 		self.image_sub = rospy.Subscriber("/duo3d/left/image_rect", Image, self.img_callback)
-		self.pose_pub = rospy.Publisher("/cctag_sp", Twist, queue_size = 1)
+		self.pose_pub = rospy.Publisher("/cctag_sp", Pose, queue_size = 1)
 		self.image = None
 		self.pose_obj = Pose()
-		self.pose_obj.position.x = 0			#in m
-		self.pose_obj.position.y = 0 	#in m
-		self.pose_obj.position.z = 0  	#in m
+		self.pose_obj.position.x = 0.0			#in m
+		self.pose_obj.position.y = 0.0 	#in m
+		self.pose_obj.position.z = 0.0  	#in m
 		self.pose_obj.orientation.x = 0
 		self.pose_obj.orientation.y = 0
 		self.pose_obj.orientation.z = 0
 		self.bridge = CvBridge()
-		self.detect_flag = False
+		self.detect_flag = True
 		self.detect_sub = rospy.Subscriber("/cctag_detect", Bool, self.detect_flag_cb)
-
+		self.centers = np.zeros((1,2))
+		self.filter_len = 5
 
 	def detect_flag_cb(self,data):
 		self.detect_flag = data.data
@@ -47,7 +48,8 @@ class BullsEyeDetection:
 		
 	def get_line_clusters(self,np_lines,rho_thresh,theta_thresh):
 		line_clusters = []
-		while(np_lines.shape[0] != 0):
+		# print("np lines = ",np_lines)
+		while(np_lines.shape[0] >2 ):
 			comp_theta = np_lines[0,1]
 			comp_rho = np_lines[0,0]
 
@@ -67,8 +69,16 @@ class BullsEyeDetection:
 	def augment_lines(self,line_clusters):
 		
 		rho_arr = line_clusters[:,0]
-		i_max = int(np.where(rho_arr == np.amax(rho_arr))[0])
-		i_min = int(np.where(rho_arr == np.amin(rho_arr))[0])
+		# print("rho_arr = ",rho_arr)
+		try:
+			i_max = int(np.where(rho_arr == np.amax(rho_arr))[0])
+		except:
+			i_max = int(np.where(rho_arr == np.amax(rho_arr))[0][0])
+		try:
+			i_min = int(np.where(rho_arr == np.amin(rho_arr))[0])
+		except:
+			i_min = int(np.where(rho_arr == np.amin(rho_arr))[0][0])
+
 
 		max_line = line_clusters[i_max]
 		min_line = line_clusters[i_min]
@@ -76,8 +86,17 @@ class BullsEyeDetection:
 		line_clusters = np.delete(line_clusters,i_min-1,0)
 		rho_arr = np.delete(rho_arr,i_max,0)
 		rho_arr = np.delete(rho_arr,i_min-1,0)
-		i_max_2 = int(np.where(rho_arr == np.amax(rho_arr))[0])
-		i_min_2 = int(np.where(rho_arr == np.amin(rho_arr))[0])
+		print("rho_arr = ",rho_arr)
+		try:
+			i_max_2 = int(np.where(rho_arr == np.amax(rho_arr))[0])
+		except:
+			i_max_2 = int(np.where(rho_arr == np.amax(rho_arr))[0][0])
+
+		try:
+			i_min_2 = int(np.where(rho_arr == np.amin(rho_arr))[0])
+		except:
+			i_min_2 = int(np.where(rho_arr == np.amin(rho_arr))[0][0])
+
 		sec_max_line = line_clusters[i_max_2]
 		sec_min_line = line_clusters[i_min_2]
 		sec_max_line[0] = sec_max_line[0]+3
@@ -95,45 +114,50 @@ class BullsEyeDetection:
 		# cv2.waitKey(0)
 		# cv2.destroyAllWindows()
 		lines = cv2.HoughLines(edges,1,np.pi/120,40)
-		lines = np.squeeze(lines)
-		edges3CH = np.dstack((edges,edges,edges))
-		np_lines=np.array(lines)
-		status = False
-		line_clusters = self.get_line_clusters(np_lines,25,0.3)
-		if(line_clusters.shape[0]>=4):
-			mod_line_cluster = self.augment_lines(line_clusters)
+		if(lines is not None):
+			lines = np.squeeze(lines)
+			edges3CH = np.dstack((edges,edges,edges))
+			np_lines=np.array(lines)
+			status = False
+			line_clusters = self.get_line_clusters(np_lines,25,0.3)
+			if(line_clusters.shape[0]>=4):
+				mod_line_cluster = self.augment_lines(line_clusters)
 
-			# print ("mod_line_cluster",mod_line_cluster)
-			rect_line = np.zeros((1,2))
-			
-			# print line_clusters
-			for rho,theta in mod_line_cluster:
-				# rho = rho+1
-				a = np.cos(np.float(theta))
-				b = np.sin(np.float(theta))
-				##### convert line from polar coordinates to cartesian coordinattes
-				slope = -a/b
-				intercept = rho/b
-				# print("intercept, slope = ",intercept,slope)
-				rect_line = np.vstack((rect_line,np.array([intercept,slope])))
-				x0 = a*rho
-				y0 = b*rho
-				x1 = int(x0 + 1000*(-b))
-				y1 = int(y0 + 1000*(a))
-				x2 = int(x0 - 1000*(-b))
-				y2 = int(y0 - 1000*(a))
-				cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
-			rect_line = rect_line[1:,:]
-			# print ("rect_line",rect_line)
-			# cv2.imshow('edges3CH', edges3CH)
-			# cv2.waitKey(1)
-			# cv2.destroyAllWindows()
-			status = True
-			return status,rect_line
+				# print ("mod_line_cluster",mod_line_cluster)
+				rect_line = np.zeros((1,2))
+				
+				# print line_clusters
+				for rho,theta in mod_line_cluster:
+					# rho = rho+1
+					a = np.cos(np.float(theta))
+					b = np.sin(np.float(theta))
+					##### convert line from polar coordinates to cartesian coordinattes
+					slope = -a/b
+					intercept = rho/b
+					# print("intercept, slope = ",intercept,slope)
+					rect_line = np.vstack((rect_line,np.array([intercept,slope])))
+					x0 = a*rho
+					y0 = b*rho
+					x1 = int(x0 + 1000*(-b))
+					y1 = int(y0 + 1000*(a))
+					x2 = int(x0 - 1000*(-b))
+					y2 = int(y0 - 1000*(a))
+					cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
+				rect_line = rect_line[1:,:]
+				# print ("rect_line",rect_line)
+				cv2.imshow('edges3CH', edges3CH)
+				cv2.waitKey(1)
+				#cv2.destroyAllWindows()
+				status = True
+				return status,rect_line
+			else:
+				print('no hough lines')
+				status = False
+				return status,lines
+
 		else:
 			status = False
 			return status,lines
-
 
 	def refine_contours(self,img,rect_line):
 		h,w = img.shape
@@ -191,16 +215,18 @@ class BullsEyeDetection:
 		        # cv2.circle(img, (int(imgpt[0]),int(imgpt[1])),5,[0,255,0],-1)
 		cv2.imshow('reprojected',img)
 		cv2.waitKey(1)
-		cv2.destroyAllWindows()
+		# cv2.destroyAllWindows()
 
 		return rotVec,transVec
 
 	def detect_ellipse_fitellipse(self,img):
 		gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+		lines = []
 		# cle = cv2.createCLAHE(clipLimit = 5.0,tileGridSize =(8,8))
 		# gray = cle.apply(gray)
 		# cv2.imshow('contrast corrected', gray)
 		# cv2.waitKey(0)
+
 		# cv2.destroyAllWindows()
 		max_val = np.amax(gray)
 		rand_thresh = gray.copy()
@@ -213,6 +239,7 @@ class BullsEyeDetection:
 		orthogonal_thresh =0.5
 
 		if(lines is not None):
+			print("first hough lines shape",len(lines))
 		
 			i,contours,h = cv2.findContours(dilated_edges,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
 			max_w = 0
@@ -255,53 +282,76 @@ class BullsEyeDetection:
 								iter_=i
 
 				# fit ellipse now
-				if(len(contours) == 0):
-					(cx,cy),(Ma,ma),th = cv2.fitEllipse(contours[iter_])
-					th = math.radians(th)
-					cv2.drawContours(img, contours[iter_], -1, (0,255,0), 2)
+				if(len(contours) != 0):
+					if(len(contours[iter_])>=5):
 
-					# print("ellipse = ",(cx,cy),(ma,Ma),th)
-					# cv2.imshow('outer ellipse', img)
+						(cx,cy),(Ma,ma),th = cv2.fitEllipse(contours[iter_])
+						th = math.radians(th)
+						cv2.drawContours(img, contours[iter_], -1, (0,255,0), 2)
+
+						# print("ellipse = ",(cx,cy),(ma,Ma),th)
+						cv2.imshow('outer ellipse', img)
+						cv2.waitKey(1)
+						#cv2.destroyAllWindows()
+						pts_src = np.array([[-self.tag_rad,0],\
+											[0,self.tag_rad],\
+											[self.tag_rad,0], \
+											[0,-self.tag_rad]])
+						pts_dst = np.array([[cx - Ma*np.cos(th)/2,cy - Ma*np.sin(th)/2],\
+											[cx - ma*np.sin(th)/2, cy + ma*np.cos(th)/2],\
+											[cx + Ma*np.cos(th)/2,cy + Ma*np.sin(th)/2],\
+											[cx + ma*np.sin(th)/2,cy - ma*np.cos(th)/2]])
+						# print("pts_dst",pts_dst)
+
+						# H,status_h = cv2.findHomography(pts_src,pts_dst)
+						im_dst = np.zeros((240,320,3))
+						# H[0,2] = 0
+						# H[1,2] = 0
+						# print("H = ",H)
+
+						# print("im_dst size",im_dst.shape[1],im_dst.shape[0])
+						# im_out = cv2.warpPerspective(img, H, (im_dst.shape[1],im_dst.shape[0]))
+						rot,trans = self.pnp(pts_dst,img)
+						print("transVec shape = ", trans.shape,trans)
+						# trans = np.reshape(trans,(3,1))
+						print("centers shape = ", self.centers.shape)
+
+						if(self.centers.shape[0]<self.filter_len):
+							self.centers = np.vstack((self.centers,np.array([trans[0,0],trans[1,0]])))
+						else:
+							self.centers = np.vstack((self.centers,np.array([trans[0,0],trans[1,0]])))
+							self.centers = np.delete(self.centers,0,0)
+
+						center_mean= np.mean(self.centers,axis = 0)
+						self.pose_obj.position.x = center_mean[0]			#in m
+						self.pose_obj.position.y = center_mean[1] 	#in m
+						# self.pose_obj.position.z = trans[2,0]  	#in m
+						# self.pose_obj.orientation.x = 0
+						# self.pose_obj.orientation.y = 0
+						# self.pose_obj.orientation.z = 0
+
+						# print("state x,y,z",self.pose_obj.position.x,self.pose_obj.position.y,self.pose_obj.position.z)
+						# self.pose_pub.publish(self.pose_obj)
+					else:
+						try:
+							print("transVec shape = ", trans.shape)
+							print("centers shape = ", self.centers.shape)
+						except:
+							pass
+						# center_mean= np.mean(self.centers,axis = 0)
+						# self.pose_obj.position.x = center_mean[0]			#in m
+						# self.pose_obj.position.y = center_mean[1]
+						# self.pose_pub.publish(self.pose_obj)
+
+					# cv2.imshow("warped img",im_out)
 					# cv2.waitKey(0)
 					# cv2.destroyAllWindows()
-					pts_src = np.array([[-self.tag_rad,0],\
-										[0,self.tag_rad],\
-										[self.tag_rad,0], \
-										[0,-self.tag_rad]])
-					pts_dst = np.array([[cx - Ma*np.cos(th)/2,cy - Ma*np.sin(th)/2],\
-										[cx - ma*np.sin(th)/2, cy + ma*np.cos(th)/2],\
-										[cx + Ma*np.cos(th)/2,cy + Ma*np.sin(th)/2],\
-										[cx + ma*np.sin(th)/2,cy - ma*np.cos(th)/2]])
-					# print("pts_dst",pts_dst)
-
-					# H,status_h = cv2.findHomography(pts_src,pts_dst)
-					im_dst = np.zeros((240,320,3))
-					# H[0,2] = 0
-					# H[1,2] = 0
-					# print("H = ",H)
-
-					# print("im_dst size",im_dst.shape[1],im_dst.shape[0])
-					# im_out = cv2.warpPerspective(img, H, (im_dst.shape[1],im_dst.shape[0]))
-					rot,trans = self.pnp(pts_dst,img)
-				# print("transVec = ", trans)
-					self.pose_obj.position.x = trans[0,0]			#in m
-					self.pose_obj.position.y = trans[1,0] 	#in m
-					self.pose_obj.position.z = trans[2,0]  	#in m
-					self.pose_obj.orientation.x = 0
-					self.pose_obj.orientation.y = 0
-					self.pose_obj.orientation.z = 0
-
-					# print("state x,y,z",self.pose_obj.position.x,self.pose_obj.position.y,self.pose_obj.position.z)
-					self.pose_pub.publish(self.pose_obj)
 				else:
-					self.pose_pub.publish(self.pose_obj)
+					print("can't fit ellipse. need at least 5 points")
 
-				# cv2.imshow("warped img",im_out)
-				# cv2.waitKey(0)
-				# cv2.destroyAllWindows()
-
+				print("I was able to detect outer rectangle")
 			else:
-				print("unable to refine")
+				print("outer rectangle not detected")
 
 
 
@@ -366,9 +416,17 @@ class BullsEyeDetection:
 	def run_pipeline(self):
 		if self.detect_flag == True:
 			if self.image is not None:
+				# cv2.imshow('cb', self.image)
+				# cv2.waitKey(1)
 				self.detect_ellipse_fitellipse(self.image)
+				print("detecting")
+
 			else:
 				print("No image published")
+			center_mean= np.mean(self.centers,axis = 0)
+			self.pose_obj.position.x = center_mean[0]			#in m
+			self.pose_obj.position.y = center_mean[1]
+			self.pose_pub.publish(self.pose_obj)
 		else:
 			print("Node on stand")
 
@@ -376,9 +434,10 @@ class BullsEyeDetection:
 def main():
 		rospy.init_node('image_reader', anonymous=True)
 		ob = BullsEyeDetection()
+		rate = rospy.Rate(30)
 		while(not rospy.is_shutdown()):
 			ob.run_pipeline()
-			# rospy.spin()
+			rate.sleep()
 
 
 if __name__ == '__main__':
