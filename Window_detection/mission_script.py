@@ -29,7 +29,7 @@ class trajectory_track:
 		self.curr_vel_yaw = 0.0 
 		# current and previous position in x-y
 		self.x_coord = 4.0
-		self.y_coord = -1.9
+		self.y_coord = -2.8
 		self.next_des = np.array([self.x_coord, self.y_coord])
 		self.prev_des = np.zeros((2,))
 		
@@ -178,14 +178,22 @@ def main():
 			yaw_reference = math.pi - yaw_reference
 		elif yaw_reference < -math.pi:
 			yaw_reference = -math.pi - yaw_reference
-		
+		print("x_vel", vel.linear.x)
+		print("y_vel", vel.linear.y)
 		#track_ob.compute_states(l_parallel, l_perpendicular)	
 		ctrl_inputs = track_ob.compute_ctrl_inputs()
 		#print("x",track_ob.current_state[0],"y", track_ob.current_state[1])
 		track_ob.bebop_vel_pub.publish(vel)
-		vel.linear.x = 0.5*ctrl_inputs[0]
-		vel.linear.y = 0.5*ctrl_inputs[1]
-		#vel.linear.z = 0	
+		if (mission1):
+			vel.linear.x = 0.5*ctrl_inputs[0]
+			vel.linear.y = 0.5*ctrl_inputs[1]
+		elif(mission2):
+			vel.linear.x = 0.5*ctrl_inputs[0]
+			vel.linear.y = 0.5*ctrl_inputs[1]
+		elif(mission3):
+			vel.linear.x = 2*ctrl_inputs[0]
+			vel.linear.y = 2*ctrl_inputs[1]
+		vel.linear.z = 0	
 		vel.angular.x = 0
 		vel.angular.y = 0
 		vel.angular.z = 0.0*(yaw_reference - track_ob.current_state[5])
@@ -193,6 +201,7 @@ def main():
 		if (mission1 and (track_ob.x_coord-0.1 < track_ob.current_state[0] < track_ob.x_coord+0.1) and (track_ob.y_coord-0.1< track_ob.current_state[1] < track_ob.y_coord+0.1)):
 			#increase z
 			detection_status = True
+			track_ob.vision_pub.publish(detection_status)
 			print("###################################")
 			while(track_ob.current_state[2] < 1.5):
 				#print('inloop')
@@ -217,8 +226,8 @@ def main():
 			while(track_ob.current_state[2] > 1.0):
 				#print('inloop')
 				vel.linear.z = -0.3
-				vel.linear.x = 0
-				vel.linear.y = 0
+				#vel.linear.x = 0
+				#vel.linear.y = 0
 				vel.angular.z = 0.0
 				track_ob.bebop_vel_pub.publish(vel)
 			rospy.sleep(2)
