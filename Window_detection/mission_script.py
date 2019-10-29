@@ -40,7 +40,7 @@ class trajectory_track:
 		# self.Twist = data.twist.twist
 		self.current_state[0] = data.twist.twist.linear.x*0.2 + self.current_state[0]
 		self.current_state[1] = data.twist.twist.linear.y*0.2 + self.current_state[1]
-		self.current_state[2] = data.pose.pose.position.z
+		self.current_state[2] = data.twist.twist.linear.z*0.2 + self.current_state[2]
 
 		self.curr_vel_odom[0] = data.twist.twist.linear.x
 		self.curr_vel_odom[1] = data.twist.twist.linear.y 
@@ -135,7 +135,7 @@ def main():
 	init_flag = True
 	rate = rospy.Rate(10)
 	# enter center coordinates
-	track_ob.next_des = np.array([1.5,1.5])
+	track_ob.next_des = np.array([1.0,1.0])
 	x_detection = 0.5
 	y_detection = 0.5
 	vel = Twist()
@@ -150,7 +150,7 @@ def main():
 
 			init_flag = False
 		#track_ob.current_state[5] = track_ob.current_state[5] - bias_ang_z 
-		print("current z:",track_ob.current_state[5])
+		print("current z:",track_ob.current_state[2])
 		#print("current y:",track_ob.current_state[1])
 		#) print(track_ob.current_state)
 		l_parallel, l_perpendicular = track_ob.traj_gen()
@@ -162,19 +162,21 @@ def main():
 		
 		track_ob.compute_states(l_parallel, l_perpendicular)	
 		ctrl_inputs = track_ob.compute_ctrl_inputs(l_parallel,l_perpendicular)
+		print("x",track_ob.current_state[0],"y", track_ob.current_state[1])
 		track_ob.bebop_vel_pub.publish(vel)
 		vel.linear.x = 1.5*ctrl_inputs[0]
 		vel.linear.y = 1.5*ctrl_inputs[1]
-		vel.linear.z = 0	
+		#vel.linear.z = 0	
 		vel.angular.x = 0
 		vel.angular.y = 0
-		vel.angular.z = 0.05*(yaw_reference - track_ob.current_state[5])
+		vel.angular.z = 0.0*(yaw_reference - track_ob.current_state[5])
 
-		if ((0.9 < track_ob.current_state[0] < 1.1) and (-0.1 < track_ob.current_state[1] < 0.1)):
+		if ((0.9 < track_ob.current_state[0] < 1.1) and (0.9 < track_ob.current_state[1] < 1.1)):
 			#increase z
-			while(track_ob.current_state[2] < 0.7):
+			print("###################################")
+			while(track_ob.current_state[2] < 1.7):
 				print('inloop')
-				vel.linear.z = 0.1
+				vel.linear.z = 0.3
 				vel.linear.x = 0
 				vel.linear.y = 0
 				vel.angular.z = 0.0
@@ -183,22 +185,23 @@ def main():
 			vel.linear.z = 0.0
 			# detect and align (x,y) with circle center
 			track_ob.next_des = np.array([x_detection, y_detection])
-		if ((x_detection-0.05 < track_ob.current_state[0] < x_detection+0.05) and (y_detection-0.05 < track_ob.current_state[1] < y_Detection+0.05)):
-			while(track_ob.current_state[2] > 0.0):
+		if ((x_detection-0.05 < track_ob.current_state[0] < x_detection+0.05) and (y_detection-0.05 < track_ob.current_state[1] < y_detection+0.05)):
+			while(track_ob.current_state[2] > 1.0):
 				print('inloop')
-				vel.linear.z = -0.1
+				vel.linear.z = -0.3
 				vel.linear.x = 0
 				vel.linear.y = 0
 				vel.angular.z = 0.0
 				track_ob.bebop_vel_pub.publish(vel)
 
 			vel.linear.z = 0.0
-			track_ob.next_des = np.array([x_detection, y_detection])
+			track_ob.next_des = np.array([x_detection, y_detection])	
+			track_ob.land()
 			
-		print("yaw reference",yaw_reference)
+		#print("yaw reference",yaw_reference)
 		
 		# vel.angular.z = 
-		print("vel z",vel.angular.z )
+		#print("vel z",vel.angular.z )
 		#print("vel y", vel.linear.y)
 		rate.sleep()
 
