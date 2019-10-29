@@ -120,22 +120,22 @@ class trajectory_track:
 		ctrl_inputs_gf[1] = - np.matmul(gains, y_pos)
 		return ctrl_inputs_gf
 
-def frame_transform(self,pos_camera):
-	Tf_quad = np.array([[0, 0, -1],
+	def frame_transform(self,pos_camera):
+		Tf_quad = np.array([[0, 0, -1],
 					   [-1, 0, 0],
 					   [0, 1,  0]])
-	Tf_inertial = np.array([[1,0,0, self.current_state[0]],
+		Tf_inertial = np.array([[1,0,0, self.current_state[0]],
 							[0,1,0, self.current_state[1]],
 							[0,0,1, self.current_state[2]],
 							[0,0,0,						1]])
 
-	pos_quad = np.matmul(Tf_quad, pos_camera)
-	pos_quad = np.array([[pos_quad[0]],
+		pos_quad = np.matmul(Tf_quad, pos_camera)
+		pos_quad = np.array([[pos_quad[0]],
 						 [pos_quad[1]],
 						 [pos_quad[2]],
 						 [		1.0 ]])
-	pos_inertial = np.matmul(Tf_inertial, pos_quad)
-	return pos_quad
+		pos_inertial = np.matmul(Tf_inertial, pos_quad)
+		return pos_quad
 
 def main():
 	rospy.init_node('trajectory_following', anonymous=True)
@@ -188,9 +188,9 @@ def main():
 			#increase z
 			detection_status = True
 			print("###################################")
-			while(track_ob.current_state[2] < 1.0):
+			while(track_ob.current_state[2] < 1.5):
 				print('inloop')
-				vel.linear.z = 0.0
+				vel.linear.z = 0.3
 				vel.linear.x = 0
 				vel.linear.y = 0
 				vel.angular.z = 0.0
@@ -198,9 +198,10 @@ def main():
 
 			vel.linear.z = 0.0
 			# detect and align (x,y) with circle center
-			track_ob.next_des = np.array([x_detection, y_detection])
+			
+			track_ob.next_des = np.array([track_ob.target[0], track_ob.target[1])
 		if ((x_detection-0.05 < track_ob.current_state[0] < x_detection+0.05) and (y_detection-0.05 < track_ob.current_state[1] < y_detection+0.05)):
-
+				
 			while(track_ob.current_state[2] > 1.0):
 				print('inloop')
 				vel.linear.z = -0.3

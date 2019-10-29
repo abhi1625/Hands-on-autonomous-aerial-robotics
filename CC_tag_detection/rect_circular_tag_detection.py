@@ -215,20 +215,21 @@ class BullsEyeDetection:
 	def pnp(self, imgPoints,img):
 		h,w = img.shape[:2]
 		# World coordinates using window measurement in world
-		long_side = 0.76/2
-		short_side = 0.50/2
+		long_side = 76/2
+		short_side = 50/2
 		objPoints = np.array([[-long_side,short_side,0],\
 									[long_side,short_side,0],\
 									[long_side,-short_side,0], \
 									[-long_side,-short_side,0]], dtype=np.float64)
-
+		print("obj points ",objPoints)
+		print("img points", imgPoints.astype(np.float64))
 		# Camera K matrix(intrinsic params)
 		camMatrix = np.array([[103.97, 0 , 208.105],[0, 103.97, 114.713],[0,0,1]],dtype=np.float64)
 
 		#distortion coefficients 
 		distCoeffs = np.array([0,0,0,0,0],dtype=np.float64)
 
-		_, rotVec, transVec = cv2.solvePnP(objPoints,imgPoints, camMatrix, distCoeffs)
+		_, rotVec, transVec = cv2.solvePnP(objPoints,imgPoints.astype(np.float64), camMatrix, distCoeffs)
 
 		# Verification by reporjecting points using rotation and 
 		# translation computed above
@@ -352,38 +353,40 @@ class BullsEyeDetection:
 			hough_status, rect_corners = self.rect_mask(stencil,edges)
 			# hough_status,houg_lines = self.get_hough_lines(stencil)
 			if(hough_status):
+				try:
+					rot,trans = self.pnp(rect_corners,img)
+					# print("transVec shape = ", trans.shape,trans)
+					# trans = np.reshape(trans,(3,1))
+					# print("centers shape = ", self.centers.shape)
 
-				rot,trans = self.pnp(pts_dst,img)
-				# print("transVec shape = ", trans.shape,trans)
-				# trans = np.reshape(trans,(3,1))
-				# print("centers shape = ", self.centers.shape)
+					if(self.centers.shape[0]<self.filter_len):
+						self.centers = np.vstack((self.centers,np.array([trans[0,0],trans[1,0]])))
+					else:
+						self.centers = np.vstack((self.centers,np.array([trans[0,0],trans[1,0]])))
+						self.centers = np.delete(self.centers,0,0)
 
-				if(self.centers.shape[0]<self.filter_len):
-					self.centers = np.vstack((self.centers,np.array([trans[0,0],trans[1,0]])))
-				else:
-					self.centers = np.vstack((self.centers,np.array([trans[0,0],trans[1,0]])))
-					self.centers = np.delete(self.centers,0,0)
+					center_mean= np.mean(self.centers,axis = 0)
+					self.pose_obj.position.x = center_mean[0]			#in m
+					self.pose_obj.position.y = center_mean[1] 	#in m
+					# self.pose_obj.position.z = trans[2,0]  	#in m
+					# self.pose_obj.orientation.x = 0
+					# self.pose_obj.orientation.y = 0
+					# self.pose_obj.orientation.z = 0
 
-				center_mean= np.mean(self.centers,axis = 0)
-				self.pose_obj.position.x = center_mean[0]			#in m
-				self.pose_obj.position.y = center_mean[1] 	#in m
-				# self.pose_obj.position.z = trans[2,0]  	#in m
-				# self.pose_obj.orientation.x = 0
-				# self.pose_obj.orientation.y = 0
-				# self.pose_obj.orientation.z = 0
+					# print("state x,y,z",self.pose_obj.position.x,self.pose_obj.position.y,self.pose_obj.position.z)
+					# self.pose_pub.publish(self.pose_obj)
+					# cv2.imshow("warped img",im_out)
+					# cv2.waitKey(0)
+					# cv2.destroyAllWindows()
 
-				# print("state x,y,z",self.pose_obj.position.x,self.pose_obj.position.y,self.pose_obj.position.z)
-				# self.pose_pub.publish(self.pose_obj)
-				# cv2.imshow("warped img",im_out)
-				# cv2.waitKey(0)
-				# cv2.destroyAllWindows()
-
-				# print("I was able to detect outer rectangle")
+					# print("I was able to detect outer rectangle")
+				except:
+					pass
 			else:
 				print("outer rectangle not detected")
 
 
-
+				
 	def detect_ellipse_hough(self,img):
 		kernel = np.ones((3,3),np.uint8)
 		gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
@@ -453,8 +456,8 @@ class BullsEyeDetection:
 			else:
 				print("No image published")
 			center_mean= np.mean(self.centers,axis = 0)
-			self.pose_obj.position.x = center_mean[0]			#in m
-			self.pose_obj.position.y = center_mean[1]
+			self.pose_obj.position.x = center_mean[0]/100			#in m
+			self.pose_obj.position.y = center_mean[1]/100
 			self.pose_pub.publish(self.pose_obj)
 		else:
 			print("Node on stand")
