@@ -20,11 +20,11 @@ class BullsEyeDetection:
                 self.data_path = '/home/pratique/drone_course_data/CC_tag_detection'
                 self.thresh = 0.8
                 self.tag_rad = 0.2075    #m
-                self.image_sub = rospy.Subscriber("/image_raw", Image, self.img_callback)
+                self.image_sub = rospy.Subscriber("/duo3d/left/image_rect", Image, self.img_callback)
                 self.pose_pub = rospy.Publisher("/cctag_sp", Twist, queue_size = 1)
                 self.image = None
                 self.pose_obj = Pose()
-
+		self.bridge = CvBridge()
 
 
 	def img_callback(self, data):
