@@ -10,23 +10,28 @@ import math
 import copy
 import os
 import rospy
-from std_msgs.msg import String
+from std_msgs.msg import String,Bool
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Twist,Pose
 from cv_bridge import CvBridge, CvBridgeError
 
 class BullsEyeDetection:
 	def __init__(self):
-                self.data_path = '/home/pratique/drone_course_data/CC_tag_detection'
-                self.thresh = 0.8
-                self.tag_rad = 0.2075    #m
-                self.image_sub = rospy.Subscriber("/duo3d/left/image_rect", Image, self.img_callback)
-                self.pose_pub = rospy.Publisher("/cctag_sp", Twist, queue_size = 1)
-                self.image = None
-                self.pose_obj = Pose()
+		self.data_path = '/home/pratique/drone_course_data/CC_tag_detection'
+		self.thresh = 0.8
+		self.tag_rad = 0.2075    #m
+		self.image_sub = rospy.Subscriber("/duo3d/left/image_rect", Image, self.img_callback)
+		self.pose_pub = rospy.Publisher("/cctag_sp", Twist, queue_size = 1)
+		self.image = None
+		self.pose_obj = Pose()
 		self.bridge = CvBridge()
+		self.detect_flag = False
+		self.detect_sub = rospy.Subscriber("/cctag_detect", Bool, self.detect_flag_cb)
 
 
+	def detect_flag_cb(self,data):
+		self.detect_flag = data.data
+		print("detect flag",self.detect_flag)
 	def img_callback(self, data):
 		try:
 			self.image = self.bridge.imgmsg_to_cv2(data, "bgr8")
@@ -216,7 +221,7 @@ class BullsEyeDetection:
 			max_h = 0
 			iter_ = -1
 			count = 0
-			print("contours",np.shape(contours))
+			# print("contours",np.shape(contours))
 			for i,c1 in enumerate(contours):
 				# print i
 				# print("c1 = ", c1)
@@ -270,7 +275,7 @@ class BullsEyeDetection:
 				th = math.radians(th)
 				cv2.drawContours(img, contours[iter_], -1, (0,255,0), 2)
 
-				print("ellipse = ",(cx,cy),(ma,Ma),th)
+				# print("ellipse = ",(cx,cy),(ma,Ma),th)
 				# cv2.imshow('outer ellipse', img)
 				# cv2.waitKey(0)
 				# cv2.destroyAllWindows()
@@ -293,7 +298,7 @@ class BullsEyeDetection:
 				# print("im_dst size",im_dst.shape[1],im_dst.shape[0])
 				# im_out = cv2.warpPerspective(img, H, (im_dst.shape[1],im_dst.shape[0]))
 				rot,trans = self.pnp(pts_dst,img)
-				print("transVec = ", trans)
+				# print("transVec = ", trans)
 				self.pose_obj.position.x = trans[0,0]			#in m
 				self.pose_obj.position.y = trans[1,0] 	#in m
 				self.pose_obj.position.z = trans[2,0]  	#in m
@@ -334,9 +339,9 @@ class BullsEyeDetection:
 		# cv2.destroyAllWindows()
 		img_three = eroded_img.copy()
 		img_three = np.dstack((img_three,eroded_img,eroded_img))
-		print("3d img shape = ",img_three.shape)
+		# print("3d img shape = ",img_three.shape)
 		circles = cv2.HoughCircles(eroded_img,cv2.HOUGH_GRADIENT,1,10,param1=150,param2=50,minRadius=0,maxRadius=0)
-		print("circles = ",circles)
+		# print("circles = ",circles)
 		                #input("aaa")
 		if(circles is not None):
 				
@@ -371,23 +376,13 @@ class BullsEyeDetection:
 		# cv2.destroyAllWindows()
 
 	def run_pipeline(self):
-		# dirname = sorted(os.listdir(self.data_path))
-		# for filename in dirname:
-		#     #print("filename",filename)
-		#     #print(os.path.join(self.data_path,filename))
-		#     img = cv2.imread(os.path.join(self.data_path,filename))
-		#     #cv2.imshow("read img",img)
-		# #cv2.waitKey(0)
-		# #cv2.destroyAllWindows()
-		#     h,w,_ = img.shape
-		#     #dim = (w/4,h/4)
-		#     #img = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
-		#     # print("img size = ",img.shape)
-		#     # self.detect_ellipse_hough(img)
-		if self.image is not None:
-			self.detect_ellipse_fitellipse(self.image)
+		if self.detect_flag == True:
+			if self.image is not None:
+				self.detect_ellipse_fitellipse(self.image)
+			else:
+				print("No image published")
 		else:
-			print("No image published")
+			print("Node on standby")
 
 
 def main():
