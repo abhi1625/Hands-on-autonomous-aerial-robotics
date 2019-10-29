@@ -121,9 +121,9 @@ class trajectory_track:
 		return ctrl_inputs_gf
 
 	def frame_transform(self,pos_camera):
-		Tf_quad = np.array([[0, 0, -1],
-					   [-1, 0, 0],
-					   [0, 1,  0]])
+		Tf_quad = np.array([[0, 0, 1],
+					   [1, 0, 0],
+					   [0, -1,  0]])
 		Tf_inertial = np.array([[1,0,0, self.current_state[0]],
 							[0,1,0, self.current_state[1]],
 							[0,0,1, self.current_state[2]],
@@ -188,7 +188,7 @@ def main():
 			#increase z
 			detection_status = True
 			print("###################################")
-			while(track_ob.current_state[2] < 1.5):
+			while(track_ob.current_state[2] < 1.3):
 				print('inloop')
 				vel.linear.z = 0.3
 				vel.linear.x = 0
@@ -200,7 +200,7 @@ def main():
 			pos_quad = track_ob.frame_transform(track_ob.target)
 			x_detection = pos_quad[0]
 			y_detection = pos_quad[1]
-			track_ob.next_des = np.array([pos_quad[0], pos_quad[1]])
+			track_ob.next_des = np.array([pos_quad[0,0], pos_quad[1,0]])
 			# detect and align (x,y) with circle center
 			
 			# track_ob.next_des = np.array([track_ob.target[0], track_ob.target[1])
@@ -217,7 +217,7 @@ def main():
 			vel.linear.z = 0.0
 			track_ob.next_des = np.array([x_detection, y_detection])	
 			track_ob.land()
-		print("pos quad = ", pos_quad)
+		#print("pos quad = ", pos_quad)
 		#print("yaw reference",yaw_reference)
 		# vel.angular.z = 
 		#print("vel z",vel.angular.z )
