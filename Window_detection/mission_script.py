@@ -153,6 +153,8 @@ def main():
 	vel = Twist()
 	detection_status = False
 	mission1 = True
+	mission2 = True
+	mission3 = False
 	while (not rospy.is_shutdown()):
 		#print(track_ob.target_sp)
 		if init_flag :
@@ -210,7 +212,7 @@ def main():
 			# detect and align (x,y) with circle center
 			
 			# track_ob.next_des = np.array([track_ob.target[0], track_ob.target[1])
-		if ((x_detection-0.05 < track_ob.current_state[0] < x_detection+0.05) and (y_detection-0.05 < track_ob.current_state[1] < y_detection+0.05)):
+		if (mission2 and (x_detection-0.05 < track_ob.current_state[0] < x_detection+0.05) and (y_detection-0.05 < track_ob.current_state[1] < y_detection+0.05)):
 				
 			while(track_ob.current_state[2] > 1.0):
 				#print('inloop')
@@ -219,7 +221,15 @@ def main():
 				vel.linear.y = 0
 				vel.angular.z = 0.0
 				track_ob.bebop_vel_pub.publish(vel)
-		
+			rospy.sleep(2)
+			pos_quad = track_ob.frame_transform(track_ob.target)
+			x_detection = pos_quad[0,0]
+			y_detection = pos_quad[1,0]
+			track_ob.next_des = np.array([pos_quad[0,0], pos_quad[1,0]])
+			mission3 = True
+			mission2 = False
+
+		if (mission3 and (track_ob.x_coord-0.05 < track_ob.current_state[0] < track_ob.x_coord+0.05) and (track_ob.y_coord-0.05< track_ob.current_state[1] < track_ob.y_coord+0.05)):		
 			vel.linear.z = 0.0
 			#track_ob.next_des = np.array([x_detection, y_detection])
 			print("Landing")
