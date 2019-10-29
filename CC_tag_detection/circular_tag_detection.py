@@ -145,8 +145,8 @@ class BullsEyeDetection:
 					cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
 				rect_line = rect_line[1:,:]
 				# print ("rect_line",rect_line)
-				cv2.imshow('edges3CH', edges3CH)
-				cv2.waitKey(1)
+				# cv2.imshow('edges3CH', edges3CH)
+				# cv2.waitKey(1)
 				#cv2.destroyAllWindows()
 				status = True
 				return status,rect_line
@@ -220,10 +220,15 @@ class BullsEyeDetection:
 		return rotVec,transVec
 
 	def detect_ellipse_fitellipse(self,img):
-		gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+		# gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 		lines = []
 		# cle = cv2.createCLAHE(clipLimit = 5.0,tileGridSize =(8,8))
 		# gray = cle.apply(gray)
+		img_hsv = cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
+		mask = ((img_hsv> np.array([0,0,230])).astype(np.float32)+(img_hsv> np.array([0,0,230])).astype(np.float32)*(-0.5) + 0.5)
+		test_img = np.uint8( (mask*img_hsv)*255/np.max(mask*img_hsv))
+		img_dark = cv2.cvtColor(test_img,cv2.COLOR_HSV2BGR)
+		gray = cv2.cvtColor(img_dark,cv2.COLOR_BGR2GRAY)
 		# cv2.imshow('contrast corrected', gray)
 		# cv2.waitKey(0)
 
@@ -238,6 +243,8 @@ class BullsEyeDetection:
 		same_thresh = 0.25
 		orthogonal_thresh =0.5
 
+		cv2.imshow('after threshold', dilated_edges)
+		cv2.waitKey(0)
 		if(lines is not None):
 			print("first hough lines shape",len(lines))
 		
@@ -290,8 +297,8 @@ class BullsEyeDetection:
 						cv2.drawContours(img, contours[iter_], -1, (0,255,0), 2)
 
 						# print("ellipse = ",(cx,cy),(ma,Ma),th)
-						cv2.imshow('outer ellipse', img)
-						cv2.waitKey(1)
+						# cv2.imshow('outer ellipse', img)
+						# cv2.waitKey(1)
 						#cv2.destroyAllWindows()
 						pts_src = np.array([[-self.tag_rad,0],\
 											[0,self.tag_rad],\
