@@ -6,7 +6,7 @@ import math
 import matplotlib.pyplot as plt
 import rospy
 import time
-from std_msgs.msg import Empty, String
+from std_msgs.msg import Empty, String, Bool
 from geometry_msgs.msg import Twist, Pose
 from nav_msgs.msg import Odometry
 from bebop_msgs.msg import Ardrone3PilotingStateAttitudeChanged
@@ -19,6 +19,7 @@ class trajectory_track:
 		self.land_pub = rospy.Publisher('/bebop/land', Empty, queue_size=1 , latch=True)
 		self.rotation_sub = rospy.Subscriber('/bebop/states/ardrone3/PilotingState/AttitudeChanged',Ardrone3PilotingStateAttitudeChanged, self.rot_callback)
 		self.target_sub = rospy.Subscriber('/cctag_sp', Pose, self.pose_cb)
+		self.vision_flag = rospy.Publisher('/cctag_detect', Bool, queue_size=1)
 		self.target_sp = Pose()
 
 		self.current_state = np.zeros((6,))
@@ -143,6 +144,7 @@ def main():
 	x_detection = 0.5
 	y_detection = 0.5
 	vel = Twist()
+	detection_status = False
 	while (not rospy.is_shutdown()):
 		print(track_ob.target_sp)
 		if init_flag :
@@ -178,6 +180,7 @@ def main():
 
 		if ((0.9 < track_ob.current_state[0] < 1.1) and (0.9 < track_ob.current_state[1] < 1.1)):
 			#increase z
+			detection_status = True
 			print("###################################")
 			while(track_ob.current_state[2] < 1.7):
 				print('inloop')
@@ -191,6 +194,7 @@ def main():
 			# detect and align (x,y) with circle center
 			track_ob.next_des = np.array([x_detection, y_detection])
 		if ((x_detection-0.05 < track_ob.current_state[0] < x_detection+0.05) and (y_detection-0.05 < track_ob.current_state[1] < y_detection+0.05)):
+
 			while(track_ob.current_state[2] > 1.0):
 				print('inloop')
 				vel.linear.z = -0.3
@@ -204,7 +208,7 @@ def main():
 			track_ob.land()
 			
 		#print("yaw reference",yaw_reference)
-		
+		track_ob.vision_flag.publish(detection_status)
 		# vel.angular.z = 
 		#print("vel z",vel.angular.z )
 		#print("vel y", vel.linear.y)
