@@ -28,7 +28,9 @@ class trajectory_track:
 		self.curr_vel_odom = np.zeros((2,1))
 		self.curr_vel_yaw = 0.0 
 		# current and previous position in x-y
-		self.next_des = np.zeros((2,))
+		self.x_coord = 4.3
+		self.y_coord = -2.1
+		self.next_des = np.array([self.x_coord, self.y_coord])
 		self.prev_des = np.zeros((2,))
 		
 		# states for trajectory tracking
@@ -95,16 +97,16 @@ class trajectory_track:
 		pos_parallel = np.matmul(l_parallel.T, pos_dist)
 		print("distance to dest: ",pos_parallel)
 
-	def compute_ctrl_inputs(self, l_parallel, l_perpendicular):
+	def compute_ctrl_inputs(self):
 		K_line = np.array([[0.2207, 0.2634, 	 0, 	0],
 						   [	 0, 	 0, 0.1301, 0.065]])
 		
-		states = np.array([self.pos_perpendicular, 
-						   self.vel_perpendicular,
-						   self.vel_parallel,
-						   self.acc_parallel])
-		states = states.reshape(4,1)
-		ctrl_inputs = - np.matmul(K_line,states)
+		#states = np.array([self.pos_perpendicular, 
+		#				   self.vel_perpendicular,
+		#				   self.vel_parallel,
+		#				   self.acc_parallel])
+		#states = states.reshape(4,1)
+		#ctrl_inputs = - np.matmul(K_line,states)
 		# print(l_perpendicular.shape)
 		# ctrl_inputs_gf = l_parallel*ctrl_inputs[0] + l_perpendicular*ctrl_inputs[1]
 		ctrl_inputs_gf = np.zeros((2,))
@@ -135,7 +137,7 @@ class trajectory_track:
 						 [pos_quad[2]],
 						 [		1.0 ]])
 		pos_inertial = np.matmul(Tf_inertial, pos_quad)
-		return pos_quad
+		return pos_inertial
 
 def main():
 	rospy.init_node('trajectory_following', anonymous=True)
@@ -145,7 +147,7 @@ def main():
 	init_flag = True
 	rate = rospy.Rate(10)
 	# enter center coordinates
-	track_ob.next_des = np.array([4.3,-1.9])
+	#track_ob.next_des = np.array([4.3,-1.9])
 	x_detection = 4.3
 	y_detection = -2.1
 	vel = Twist()
@@ -166,16 +168,17 @@ def main():
 		#print("current y:",track_ob.current_state[1])
 		#) print(track_ob.current_state)
 		track_ob.vision_pub.publish(detection_status)
-		l_parallel, l_perpendicular = track_ob.traj_gen()
-		yaw_reference = math.atan2(l_parallel[1], l_parallel[0]) + bias_ang_z
+		#l_parallel, l_perpendicular = track_ob.traj_gen()
+		#yaw_reference = math.atan2(l_parallel[1], l_parallel[0]) + bias_ang_z
+		yaw_reference = 0.0
 		if yaw_reference > math.pi:
 			yaw_reference = math.pi - yaw_reference
 		elif yaw_reference < -math.pi:
 			yaw_reference = -math.pi - yaw_reference
 		
-		track_ob.compute_states(l_parallel, l_perpendicular)	
-		ctrl_inputs = track_ob.compute_ctrl_inputs(l_parallel,l_perpendicular)
-		print("x",track_ob.current_state[0],"y", track_ob.current_state[1])
+		#track_ob.compute_states(l_parallel, l_perpendicular)	
+		ctrl_inputs = track_ob.compute_ctrl_inputs()
+		#print("x",track_ob.current_state[0],"y", track_ob.current_state[1])
 		track_ob.bebop_vel_pub.publish(vel)
 		vel.linear.x = 0.5*ctrl_inputs[0]
 		vel.linear.y = 0.5*ctrl_inputs[1]
@@ -188,7 +191,7 @@ def main():
 			#increase z
 			detection_status = True
 			print("###################################")
-			while(track_ob.current_state[2] < 1.3):
+			while(track_ob.current_state[2] < 1.5):
 				print('inloop')
 				vel.linear.z = 0.3
 				vel.linear.x = 0
@@ -221,7 +224,8 @@ def main():
 		#print("yaw reference",yaw_reference)
 		# vel.angular.z = 
 		#print("vel z",vel.angular.z )
-		#print("vel y", vel.linear.y)
+		#print("vel y", vel.linear.y)i
+		print("traj ",track_ob.next_des)
 		rate.sleep()
 
 if __name__ == '__main__':
