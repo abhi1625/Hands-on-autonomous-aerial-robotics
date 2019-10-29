@@ -19,8 +19,9 @@ class trajectory_track:
 		self.land_pub = rospy.Publisher('/bebop/land', Empty, queue_size=1 , latch=True)
 		self.rotation_sub = rospy.Subscriber('/bebop/states/ardrone3/PilotingState/AttitudeChanged',Ardrone3PilotingStateAttitudeChanged, self.rot_callback)
 		self.target_sub = rospy.Subscriber('/cctag_sp', Pose, self.pose_cb)
-		self.vision_flag = rospy.Publisher('/cctag_detect', Bool, queue_size=1)
+		self.vision_pub = rospy.Publisher('/cctag_detect', Bool, queue_size=1)
 		self.target_sp = Pose()
+		self.target = np.zeros((3,))
 
 		self.current_state = np.zeros((6,))
 		self.prev_vel_odom = np.zeros((2,1))
@@ -38,6 +39,10 @@ class trajectory_track:
 
 	def pose_cb(self,data):
 		self.target_sp = data
+		self.target[0] = data.position.x
+		self.target[1] = data.position.y
+		self.target[2] = data.position.z
+		self.target.reshape((3,1))
 
 	def odom_callback(self, data):
 		# self.pose = data.pose.pose
@@ -124,7 +129,7 @@ def frame_transform(self,pos_camera):
 							[0,0,1, self.current_state[2]],
 							[0,0,0,						1]])
 
-	pos_quad = np.matmul(Tf_mat, pos_camera)
+	pos_quad = np.matmul(Tf_quad, pos_camera)
 	pos_quad = np.array([[pos_quad[0]],
 						 [pos_quad[1]],
 						 [pos_quad[2]],
@@ -140,9 +145,9 @@ def main():
 	init_flag = True
 	rate = rospy.Rate(10)
 	# enter center coordinates
-	track_ob.next_des = np.array([1.0,1.0])
-	x_detection = 0.5
-	y_detection = 0.5
+	track_ob.next_des = np.array([4.3,-1.9])
+	x_detection = 4.3
+	y_detection = -2.1
 	vel = Twist()
 	detection_status = False
 	while (not rospy.is_shutdown()):
@@ -160,6 +165,7 @@ def main():
 		print("current z:",track_ob.current_state[2])
 		#print("current y:",track_ob.current_state[1])
 		#) print(track_ob.current_state)
+		track_ob.vision_pub.publish(detection_status)
 		l_parallel, l_perpendicular = track_ob.traj_gen()
 		yaw_reference = math.atan2(l_parallel[1], l_parallel[0]) + bias_ang_z
 		if yaw_reference > math.pi:
@@ -171,20 +177,20 @@ def main():
 		ctrl_inputs = track_ob.compute_ctrl_inputs(l_parallel,l_perpendicular)
 		print("x",track_ob.current_state[0],"y", track_ob.current_state[1])
 		track_ob.bebop_vel_pub.publish(vel)
-		vel.linear.x = 1.5*ctrl_inputs[0]
-		vel.linear.y = 1.5*ctrl_inputs[1]
+		vel.linear.x = 0.5*ctrl_inputs[0]
+		vel.linear.y = 0.5*ctrl_inputs[1]
 		#vel.linear.z = 0	
 		vel.angular.x = 0
 		vel.angular.y = 0
 		vel.angular.z = 0.0*(yaw_reference - track_ob.current_state[5])
-
-		if ((0.9 < track_ob.current_state[0] < 1.1) and (0.9 < track_ob.current_state[1] < 1.1)):
+	
+		if ((4.2 < track_ob.current_state[0] < 4.4) and (-2.0 < track_ob.current_state[1] < -1.8)):
 			#increase z
 			detection_status = True
 			print("###################################")
-			while(track_ob.current_state[2] < 1.7):
+			while(track_ob.current_state[2] < 1.0):
 				print('inloop')
-				vel.linear.z = 0.3
+				vel.linear.z = 0.0
 				vel.linear.x = 0
 				vel.linear.y = 0
 				vel.angular.z = 0.0
@@ -205,10 +211,10 @@ def main():
 
 			vel.linear.z = 0.0
 			track_ob.next_des = np.array([x_detection, y_detection])	
-			track_ob.land()
-			
+			# track_ob.land()
+		pos_quad = track_ob.frame_transform(track_ob.target)
+		print("pos quad = ", pos_quad)
 		#print("yaw reference",yaw_reference)
-		track_ob.vision_flag.publish(detection_status)
 		# vel.angular.z = 
 		#print("vel z",vel.angular.z )
 		#print("vel y", vel.linear.y)

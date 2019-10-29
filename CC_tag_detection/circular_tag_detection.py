@@ -18,7 +18,7 @@ from cv_bridge import CvBridge, CvBridgeError
 class BullsEyeDetection:
 	def __init__(self):
 		self.data_path = '/home/pratique/drone_course_data/CC_tag_detection'
-		self.thresh = 0.8
+		self.thresh = 0.9
 		self.tag_rad = 0.2075    #m
 		self.image_sub = rospy.Subscriber("/duo3d/left/image_rect", Image, self.img_callback)
 		self.pose_pub = rospy.Publisher("/cctag_sp", Pose, queue_size = 1)
@@ -31,7 +31,7 @@ class BullsEyeDetection:
 		self.pose_obj.orientation.y = 0
 		self.pose_obj.orientation.z = 0
 		self.bridge = CvBridge()
-		self.detect_flag = True
+		self.detect_flag = False
 		self.detect_sub = rospy.Subscriber("/cctag_detect", Bool, self.detect_flag_cb)
 		self.centers = np.zeros((1,2))
 		self.filter_len = 5
@@ -107,19 +107,43 @@ class BullsEyeDetection:
 		
 		return line_clusters
 
+
+
 	def get_hough_lines(self,edges):
-		kernel = np.ones((2,2),np.uint8)
+		kernel = np.ones((11,11),np.uint8)
 		edges = cv2.dilate(edges,kernel,iterations = 1)
 		# cv2.imshow('dilated edges in hough', edges)
 		# cv2.waitKey(0)
 		# cv2.destroyAllWindows()
-		lines = cv2.HoughLines(edges,1,np.pi/120,40)
+		# kernel = np.ones((2,2),np.uint8)
+		# dilated_edges = cv2.dilate(edges,kernel,iterations = 1)
+
+		minLength = 200
+		maxLineGap = 50
+		# lines = cv2.HoughLines(edges,1,np.pi/120,40)
+		lines = cv2.HoughLinesP(edges,1,np.pi/120,10, minLength, maxLineGap)
+
+
 		if(lines is not None):
-			lines = np.squeeze(lines)
+			# lines = np.squeeze(lines)
+			print("houghlinesP shape =", lines.shape)
 			edges3CH = np.dstack((edges,edges,edges))
-			np_lines=np.array(lines)
+			new_lines = []
+			for x1, y1, x2, y2 in lines[:,0,:]:
+				m = (y1-y2)/(x1-x2)
+				th = math.atan2(-1,m)
+				rh = (-m*x1+y1)*math.sin(th)
+				cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
+				# rect_line = rect_line[1:,:]
+				# print ("rect_line",rect_line)
+				new_lines.append([rh,th])
+			# cv2.imshow('edges3CH', edges3CH)
+			# cv2.waitKey(1)
+			# print("new_lines = ",new_lines)
+			np_lines=np.array(new_lines)
 			status = False
-			line_clusters = self.get_line_clusters(np_lines,25,0.3)
+			line_clusters = self.get_line_clusters(np_lines,25,0.4)
+			print("lines clusters = ", line_clusters)
 			if(line_clusters.shape[0]>=4):
 				mod_line_cluster = self.augment_lines(line_clusters)
 
@@ -127,7 +151,9 @@ class BullsEyeDetection:
 				rect_line = np.zeros((1,2))
 				
 				# print line_clusters
-				for rho,theta in mod_line_cluster:
+				# for rho,theta in mod_line_cluster:
+				for rho,theta in new_lines:
+
 					# rho = rho+1
 					a = np.cos(np.float(theta))
 					b = np.sin(np.float(theta))
@@ -142,16 +168,16 @@ class BullsEyeDetection:
 					y1 = int(y0 + 1000*(a))
 					x2 = int(x0 - 1000*(-b))
 					y2 = int(y0 - 1000*(a))
-					cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
+					# cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
 				rect_line = rect_line[1:,:]
 				# print ("rect_line",rect_line)
 				# cv2.imshow('edges3CH', edges3CH)
 				# cv2.waitKey(1)
-				#cv2.destroyAllWindows()
+				# cv2.destroyAllWindows()
 				status = True
 				return status,rect_line
 			else:
-				print('no hough lines')
+				# print('no hough lines')
 				status = False
 				return status,lines
 
@@ -167,13 +193,13 @@ class BullsEyeDetection:
 		cols = mesh[1,:,:]
 		# print("row and col shape", rows.shape, cols.shape)
 		for i,[intercept,slope] in enumerate(rect_line):
-			if(i == 0):
-				img[rows-slope*cols-intercept>0] = 0
 			if(i == 1):
+				img[rows-slope*cols-intercept>0] = 0
+			if(i == 3):
 				img[rows-slope*cols-intercept<0] = 0
 			if(i == 2):
 				img[rows-slope*cols-intercept>0] = 0
-			if(i == 3):
+			if(i == 0):
 				img[rows-slope*cols-intercept<0] = 0
 			
 		# intercept0,slope0 = rect_line[0]
@@ -213,22 +239,95 @@ class BullsEyeDetection:
 		        imgpt = imgPoints[i]
 		        cv2.circle(img, (int(pt[0]), int(pt[1])),5,[255,0,0],-1)
 		        # cv2.circle(img, (int(imgpt[0]),int(imgpt[1])),5,[0,255,0],-1)
-		cv2.imshow('reprojected',img)
-		cv2.waitKey(1)
+		# cv2.imshow('reprojected',img)
+		# cv2.waitKey(1)
 		# cv2.destroyAllWindows()
 
 		return rotVec,transVec
 
+	def get_outer_window_corner_points(self, corner_pts, img):
+		distances = corner_pts[:,0]**2 + corner_pts[:,1]**2
+		h,w = img.shape[:2]
+		# print("corner_pts = ",corner_pts)
+		left_pt = np.argmin(distances)
+		left_top_corner = corner_pts[left_pt,:]
+		# print("")
+
+		distances = (corner_pts[:,0]-w)**2 + (corner_pts[:,1])**2
+		right_top_corner = corner_pts[np.argmin(distances),:]
+
+		bottom_most_pt = np.argmax(corner_pts[:,1])
+		# print("bottom_most_pt = ", corner_pts[bottom_most_pt,:])
+		# corner_pts = np.delete(corner_pts,bottom_most_pt,0)
+
+
+		distances = (corner_pts[:,0]-w)**2 + (corner_pts[:,1]-h)**2
+		right_bottom_corner = corner_pts[np.argmin(distances),:]
+
+		distances = corner_pts[:,0]**2 + (corner_pts[:,1]-h)**2
+		left_bottom_corner = corner_pts[np.argmin(distances),:]
+
+		addd = 7
+		imgPoints = np.array([[left_top_corner[0]+addd,left_top_corner[1]+addd],
+							  [right_top_corner[0]-addd,right_top_corner[1]+addd],
+							  [right_bottom_corner[0]-addd,right_bottom_corner[1]-addd],
+							  [left_bottom_corner[0]+addd,left_bottom_corner[1]-addd ]],dtype=np.int32)
+		imgPoints = np.squeeze(imgPoints)
+
+		return imgPoints
+
+	def rect_mask(self,edges,allcountour_img):
+		kernel = np.ones((7,7),np.uint8)
+		dilated_edges = cv2.dilate(edges,kernel,iterations = 1)
+		houghlines_gray, contours, hierarchy = cv2.findContours(dilated_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+		epsilon = 0.1*cv2.arcLength(contours[0], True)
+		approx = cv2.approxPolyDP(contours[0], epsilon, True)
+		edges3CH = np.dstack((dilated_edges,dilated_edges,dilated_edges))
+		img = np.zeros_like(edges)
+		status = False
+		if ((len(approx) >= 4)):
+			points = np.squeeze(np.array(approx))
+			# print("points",points)
+			if cv2.isContourConvex(points):
+				corners = self.get_outer_window_corner_points(points, edges3CH)
+				cv2.drawContours(edges3CH, [corners], 0, (0,0,255), 3)
+
+				new_rect_lines = []
+				for i,[x1,y1] in enumerate(corners):
+					j = i+1
+					if i==3:
+						j = 0
+					x2,y2 = corners[j]
+					m = (y1-y2)/(x1-x2) 
+					if(x1-x2) == 0:
+						m = (y1-y2)/0.00001
+					c = -m*x1+y1
+					new_rect_lines.append([c,m])
+
+				img = self.refine_contours(allcountour_img,new_rect_lines)
+
+
+				# cv2.imshow("dilated",edges3CH)
+				# cv2.waitKey(1)
+				# cv2.imshow("rect",img)
+				# cv2.waitKey(1)
+				status = True
+				return status,img
+
+		status = False
+		return status, img
+
+
 	def detect_ellipse_fitellipse(self,img):
-		# gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-		lines = []
+		gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+		# lines = []
 		# cle = cv2.createCLAHE(clipLimit = 5.0,tileGridSize =(8,8))
 		# gray = cle.apply(gray)
-		img_hsv = cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
-		mask = ((img_hsv> np.array([0,0,230])).astype(np.float32)+(img_hsv> np.array([0,0,230])).astype(np.float32)*(-0.5) + 0.5)
-		test_img = np.uint8( (mask*img_hsv)*255/np.max(mask*img_hsv))
-		img_dark = cv2.cvtColor(test_img,cv2.COLOR_HSV2BGR)
-		gray = cv2.cvtColor(img_dark,cv2.COLOR_BGR2GRAY)
+		# img_hsv = cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
+		# mask = ((img_hsv> np.array([0,0,230])).astype(np.float32)+(img_hsv> np.array([0,0,230])).astype(np.float32)*(-0.5) + 0.5)
+		# test_img = np.uint8( (mask*img_hsv)*255/np.max(mask*img_hsv))
+		# img_dark = cv2.cvtColor(test_img,cv2.COLOR_HSV2BGR)
+		# gray = cv2.cvtColor(img_dark,cv2.COLOR_BGR2GRAY)
 		# cv2.imshow('contrast corrected', gray)
 		# cv2.waitKey(0)
 
@@ -240,13 +339,11 @@ class BullsEyeDetection:
 		kernel = np.ones((2,2),np.uint8)
 		dilated_edges = cv2.dilate(edges,kernel,iterations = 1)
 		lines = cv2.HoughLines(edges,1,np.pi/180,30)
-		same_thresh = 0.25
-		orthogonal_thresh =0.5
-
-		cv2.imshow('after threshold', dilated_edges)
-		cv2.waitKey(0)
+		
+		# cv2.imshow('after threshold', dilated_edges)
+		# cv2.waitKey(1)
 		if(lines is not None):
-			print("first hough lines shape",len(lines))
+			# print("first hough lines shape",len(lines))
 		
 			i,contours,h = cv2.findContours(dilated_edges,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
 			max_w = 0
@@ -269,10 +366,11 @@ class BullsEyeDetection:
 			stencil = np.zeros(edges.shape).astype(edges.dtype)
 			color = [255, 255, 255]
 			cv2.fillPoly(stencil, contours[iter_], color)
-			hough_status,houg_lines = self.get_hough_lines(stencil)
+			hough_status, only_circles = self.rect_mask(stencil,edges)
+			# hough_status,houg_lines = self.get_hough_lines(stencil)
 			if(hough_status):
-				refined_contours = self.refine_contours(edges,houg_lines)
-				_,contours,h = cv2.findContours(refined_contours,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
+
+				_,contours,h = cv2.findContours(only_circles,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
 				# print("h = ", h)
 				max_w = 0
 				max_h = 0
@@ -319,9 +417,9 @@ class BullsEyeDetection:
 						# print("im_dst size",im_dst.shape[1],im_dst.shape[0])
 						# im_out = cv2.warpPerspective(img, H, (im_dst.shape[1],im_dst.shape[0]))
 						rot,trans = self.pnp(pts_dst,img)
-						print("transVec shape = ", trans.shape,trans)
+						# print("transVec shape = ", trans.shape,trans)
 						# trans = np.reshape(trans,(3,1))
-						print("centers shape = ", self.centers.shape)
+						# print("centers shape = ", self.centers.shape)
 
 						if(self.centers.shape[0]<self.filter_len):
 							self.centers = np.vstack((self.centers,np.array([trans[0,0],trans[1,0]])))
@@ -339,24 +437,13 @@ class BullsEyeDetection:
 
 						# print("state x,y,z",self.pose_obj.position.x,self.pose_obj.position.y,self.pose_obj.position.z)
 						# self.pose_pub.publish(self.pose_obj)
-					else:
-						try:
-							print("transVec shape = ", trans.shape)
-							print("centers shape = ", self.centers.shape)
-						except:
-							pass
-						# center_mean= np.mean(self.centers,axis = 0)
-						# self.pose_obj.position.x = center_mean[0]			#in m
-						# self.pose_obj.position.y = center_mean[1]
-						# self.pose_pub.publish(self.pose_obj)
-
 					# cv2.imshow("warped img",im_out)
 					# cv2.waitKey(0)
 					# cv2.destroyAllWindows()
 				else:
 					print("can't fit ellipse. need at least 5 points")
 
-				print("I was able to detect outer rectangle")
+				# print("I was able to detect outer rectangle")
 			else:
 				print("outer rectangle not detected")
 
@@ -441,7 +528,7 @@ class BullsEyeDetection:
 def main():
 		rospy.init_node('image_reader', anonymous=True)
 		ob = BullsEyeDetection()
-		rate = rospy.Rate(30)
+		rate = rospy.Rate(15)
 		while(not rospy.is_shutdown()):
 			ob.run_pipeline()
 			rate.sleep()
