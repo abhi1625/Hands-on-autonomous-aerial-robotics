@@ -121,9 +121,9 @@ class trajectory_track:
 		return ctrl_inputs_gf
 
 	def frame_transform(self,pos_camera):
-		Tf_quad = np.array([[0, 0, 1],
+		Tf_quad = np.array([[0, -1, 0],
 					   [1, 0, 0],
-					   [0, -1,  0]])
+					   [0, 0,  1]])
 		Tf_inertial = np.array([[1,0,0, self.current_state[0]],
 							[0,1,0, self.current_state[1]],
 							[0,0,1, self.current_state[2]],
