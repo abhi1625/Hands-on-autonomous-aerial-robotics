@@ -23,16 +23,21 @@ class trajectory_track:
 		self.target_sp = Pose()
 		self.target = np.zeros((3,))
 
-		self.current_state = np.zeros((6,))
-		self.prev_vel_odom = np.zeros((2,1))
-		self.curr_vel_odom = np.zeros((2,1))
-		self.curr_vel_yaw = 0.0 
+		## Report stuff
+		self.quad_pose_pub = rospy.Publisher('/quad_pose', Pose, queue_size = 1)
+		self.target_pose_inertial = rospy.Publisher('/target_pose_inertial', Pose, queue_size = 1)
+		self.target_pose = Pose()
+
 		# current and previous position in x-y
 		self.x_coord = 3.1
 		self.y_coord = 1.7
 		self.next_des = np.array([self.x_coord, self.y_coord])
 		self.prev_des = np.zeros((2,))
 		
+		self.current_state = np.zeros((6,))
+		self.prev_vel_odom = np.zeros((2,1))
+		self.curr_vel_odom = np.zeros((2,1))
+		self.curr_vel_yaw = 0.0 
 		# states for trajectory tracking
 		self.pos_perpendicular = np.zeros((2,1))
 		self.vel_perpendicular = np.zeros((2,1))
@@ -137,6 +142,11 @@ class trajectory_track:
 						 [pos_quad[2]],
 						 [		1.0 ]])
 		pos_inertial = np.matmul(Tf_inertial, pos_quad)
+		self.target_pose.position.x = pos_inertial[0,0]
+		self.target_pose.position.y = pos_inertial[1,0]
+		self.target_pose.position.z = 0
+		self.target_pose_inertial.publish(self.target_pose)
+
 		return pos_inertial
 
 def main():
@@ -155,6 +165,11 @@ def main():
 	mission1 = True
 	mission2 = False
 	mission3 = False
+
+	# Report stuff
+	quad_pose = Pose()
+	
+
 	while (not rospy.is_shutdown()):
 		#print(track_ob.target_sp)
 		if init_flag :
@@ -260,13 +275,23 @@ def main():
 			print("Landing")
 			rospy.sleep(2)	
 			track_ob.land()
-		#print("pos quad = ", pos_quad)
-		#print("yaw reference",yaw_reference)
-		# vel.angular.z = 
-		#print("vel z",vel.angular.z )
-		#print("vel y", vel.linear.y)i
+		
 		print("traj ",track_ob.next_des)
+		
+
+		## Report stuff
+		quad_pose.position.x = track_ob.current_state[0]
+		quad_pose.position.y = track_ob.current_state[1]
+		quad_pose.position.z = track_ob.current_state[2]
+		quad_pose.orientation.x = track_ob.current_state[3]
+		quad_pose.orientation.y = track_ob.current_state[4]
+		quad_pose.orientation.z = track_ob.current_state[5]
+		track_ob.quad_pose_pub.publish(quad_pose)
+		temp = track_ob.frame_transform(track_ob.target)
 		rate.sleep()
+
+
+
 
 if __name__ == '__main__':
 	main()
