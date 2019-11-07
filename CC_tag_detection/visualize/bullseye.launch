@@ -1,0 +1,6 @@
+<launch>
+	<group >
+		<node pkg="drone_course_pkg" type="video_sub.py" name="traj"/>
+		<node pkg="rosbag" type="play" name="rosbag" required="true" args="-s 5 /home/pratique/drone_course_data/CC_tag_detection/Submission_cctag.bag"/>
+	</group>
+</launch>

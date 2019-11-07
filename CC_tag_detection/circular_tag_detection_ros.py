@@ -17,8 +17,8 @@ from cv_bridge import CvBridge, CvBridgeError
 
 class BullsEyeDetection:
 	def __init__(self):
-		self.data_path = '/home/pratique/drone_course_data/CC_tag_detection/test_images'
-		self.thresh = 0.7
+		self.data_path = '/home/pratique/drone_course_data/CC_tag_detection'
+		self.thresh = 0.9
 		self.tag_rad = 0.2075    #m
 		self.image_sub = rospy.Subscriber("/duo3d/left/image_rect", Image, self.img_callback)
 		self.pose_pub = rospy.Publisher("/cctag_sp", Pose, queue_size = 1)
@@ -31,11 +31,10 @@ class BullsEyeDetection:
 		self.pose_obj.orientation.y = 0
 		self.pose_obj.orientation.z = 0
 		self.bridge = CvBridge()
-		self.detect_flag = True
+		self.detect_flag = False
 		self.detect_sub = rospy.Subscriber("/cctag_detect", Bool, self.detect_flag_cb)
 		self.centers = np.zeros((1,2))
 		self.filter_len = 5
-		self.i = 1
 
 	def detect_flag_cb(self,data):
 		self.detect_flag = data.data
@@ -119,40 +118,28 @@ class BullsEyeDetection:
 		# kernel = np.ones((2,2),np.uint8)
 		# dilated_edges = cv2.dilate(edges,kernel,iterations = 1)
 
-		minLength = 80
+		minLength = 200
 		maxLineGap = 50
-		lines = cv2.HoughLines(edges,1,np.pi/180,80)
-		# lines = np.squeeze(lines)
-		# lines = cv2.HoughLinesP(edges,1,np.pi/120,10, minLength, maxLineGap)
+		# lines = cv2.HoughLines(edges,1,np.pi/120,40)
+		lines = cv2.HoughLinesP(edges,1,np.pi/120,10, minLength, maxLineGap)
 
 
 		if(lines is not None):
-			lines = np.squeeze(lines)
-			print("houghlines shape =", lines.shape)
+			# lines = np.squeeze(lines)
+			print("houghlinesP shape =", lines.shape)
 			edges3CH = np.dstack((edges,edges,edges))
 			new_lines = []
-			rect_line = np.zeros((1,2))
-
-			for rho,theta in lines:
-				a = np.cos(np.float(theta))
-				b = np.sin(np.float(theta))
-				##### convert line from polar coordinates to cartesian coordinattes
-				slope = -a/b
-				intercept = rho/b
-				# print("intercept, slope = ",intercept,slope)
-				rect_line = np.vstack((rect_line,np.array([intercept,slope])))
-				x0 = a*rho
-				y0 = b*rho
-				x1 = int(x0 + 1000*(-b))
-				y1 = int(y0 + 1000*(a))
-				x2 = int(x0 - 1000*(-b))
-				y2 = int(y0 - 1000*(a))
+			for x1, y1, x2, y2 in lines[:,0,:]:
+				m = (y1-y2)/(x1-x2)
+				th = math.atan2(-1,m)
+				rh = (-m*x1+y1)*math.sin(th)
 				cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
-				# new_lines.append([rh,th])
-			# cv2.imshow('all houg_lines', edges3CH)
-			# cv2.waitKey(0)
-			# cv2.destroyAllWindows()
-			print("new_lines = ",new_lines)
+				# rect_line = rect_line[1:,:]
+				# print ("rect_line",rect_line)
+				new_lines.append([rh,th])
+			# cv2.imshow('edges3CH', edges3CH)
+			# cv2.waitKey(1)
+			# print("new_lines = ",new_lines)
 			np_lines=np.array(new_lines)
 			status = False
 			line_clusters = self.get_line_clusters(np_lines,25,0.4)
@@ -181,11 +168,11 @@ class BullsEyeDetection:
 					y1 = int(y0 + 1000*(a))
 					x2 = int(x0 - 1000*(-b))
 					y2 = int(y0 - 1000*(a))
-					cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
+					# cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
 				rect_line = rect_line[1:,:]
 				# print ("rect_line",rect_line)
-				# cv2.imshow('clustered hough lines', edges3CH)
-				# cv2.waitKey(0)
+				# cv2.imshow('edges3CH', edges3CH)
+				# cv2.waitKey(1)
 				# cv2.destroyAllWindows()
 				status = True
 				return status,rect_line
@@ -204,30 +191,25 @@ class BullsEyeDetection:
 		# print ("mesh shape = ", mesh.shape)
 		rows = mesh[0,:,:]
 		cols = mesh[1,:,:]
-
-		# cv2.imshow('removed rectangle', img)
-		# cv2.waitKey(0)
-		# cv2.destroyAllWindows()
 		# print("row and col shape", rows.shape, cols.shape)
 		for i,[intercept,slope] in enumerate(rect_line):
-			if(i == 3):
-				img[rows-slope*cols-intercept>0] = 0
-			if(i == 2):
-				img[rows-slope*cols-intercept<0] = 0
 			if(i == 1):
+				img[rows-slope*cols-intercept>0] = 0
+			if(i == 3):
 				img[rows-slope*cols-intercept<0] = 0
+			if(i == 2):
+				img[rows-slope*cols-intercept>0] = 0
 			if(i == 0):
 				img[rows-slope*cols-intercept<0] = 0
-
-			# cv2.imshow('removed rectangle', img)
-			# cv2.waitKey(0)
-			# cv2.destroyAllWindows()
 			
 		# intercept0,slope0 = rect_line[0]
 		# intercept1,slope1 = rect_line[1]
 		# intercept2,slope2 = rect_line[2]
 		# intercept3,slope3 = rect_line[3]
 		
+		# cv2.imshow('removed rectangle', img)
+		# cv2.waitKey(0)
+		# cv2.destroyAllWindows()
 		return img
 
 	def pnp(self, imgPoints,img):
@@ -285,7 +267,7 @@ class BullsEyeDetection:
 		distances = corner_pts[:,0]**2 + (corner_pts[:,1]-h)**2
 		left_bottom_corner = corner_pts[np.argmin(distances),:]
 
-		addd = 6
+		addd = 7
 		imgPoints = np.array([[left_top_corner[0]+addd,left_top_corner[1]+addd],
 							  [right_top_corner[0]-addd,right_top_corner[1]+addd],
 							  [right_bottom_corner[0]-addd,right_bottom_corner[1]-addd],
@@ -301,19 +283,14 @@ class BullsEyeDetection:
 		epsilon = 0.1*cv2.arcLength(contours[0], True)
 		approx = cv2.approxPolyDP(contours[0], epsilon, True)
 		edges3CH = np.dstack((dilated_edges,dilated_edges,dilated_edges))
-		# cv2.drawContours(edges3CH, contours[0], -1, (0,255,0), 2)
-		# cv2.imshow("contours biggest",edges3CH)
-		# cv2.waitKey(0)
-		# cv2.destroyAllWindows()
 		img = np.zeros_like(edges)
 		status = False
 		if ((len(approx) >= 4)):
 			points = np.squeeze(np.array(approx))
-			print("points",points)
+			# print("points",points)
 			if cv2.isContourConvex(points):
-				print(" con")
 				corners = self.get_outer_window_corner_points(points, edges3CH)
-				# cv2.drawContours(edges3CH, [approx], 0, (0,0,255), 3)
+				cv2.drawContours(edges3CH, [corners], 0, (0,0,255), 3)
 
 				new_rect_lines = []
 				for i,[x1,y1] in enumerate(corners):
@@ -321,26 +298,19 @@ class BullsEyeDetection:
 					if i==3:
 						j = 0
 					x2,y2 = corners[j]
-					m = math.atan2((y2-y1),(x2-x1)) 
+					m = (y1-y2)/(x1-x2) 
 					if(x1-x2) == 0:
-						m = (y1-y2)/0.000000001
+						m = (y1-y2)/0.00001
 					c = -m*x1+y1
 					new_rect_lines.append([c,m])
-					cv2.line(edges3CH,(x1,y1),(x2,y2),(0,0,255),2)
+
+				img = self.refine_contours(allcountour_img,new_rect_lines)
 
 
-				# cv2.imshow("rectangle",edges3CH)
-				# cv2.waitKey(0)
-				# cv2.destroyAllWindows()
-				# img = self.refine_contours(allcountour_img,new_rect_lines)
-				mask_rect= np.zeros_like(edges)
-				cv2.fillPoly(mask_rect, [corners], [255,255,255])
-				ell_img = allcountour_img * mask_rect
-				img = np.uint8(ell_img*255/np.max(ell_img))
-
+				# cv2.imshow("dilated",edges3CH)
+				# cv2.waitKey(1)
 				# cv2.imshow("rect",img)
-				# cv2.waitKey(0)
-				# cv2.destroyAllWindows()
+				# cv2.waitKey(1)
 				status = True
 				return status,img
 
@@ -348,8 +318,7 @@ class BullsEyeDetection:
 		return status, img
 
 
-	def detect_ellipse_fitellipse(self,img,i):
-		original_img = img.copy()
+	def detect_ellipse_fitellipse(self,img):
 		gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 		# lines = []
 		# cle = cv2.createCLAHE(clipLimit = 5.0,tileGridSize =(8,8))
@@ -366,61 +335,25 @@ class BullsEyeDetection:
 		max_val = np.amax(gray)
 		rand_thresh = gray.copy()
 		rand_thresh[rand_thresh[:]<(max_val*self.thresh)] = 0 
-		# cv2.imshow('after threshold', rand_thresh)
-		# cv2.imwrite('color_seg.jpg', rand_thresh)
-		# cv2.waitKey(0)
-		# cv2.destroyAllWindows()
 		edges = cv2.Canny(rand_thresh,50,150,apertureSize = 3)
-		# cv2.imshow('first canny', edges)
-		# cv2.imwrite('canny.jpg', edges)
-		# cv2.waitKey(0)
-		# cv2.destroyAllWindows()
 		kernel = np.ones((2,2),np.uint8)
 		dilated_edges = cv2.dilate(edges,kernel,iterations = 1)
+		lines = cv2.HoughLines(edges,1,np.pi/180,30)
+		
+		# cv2.imshow('after threshold', dilated_edges)
 		# cv2.waitKey(1)
-		# if(lines is not None):
-		# print("first hough lines shape",len(lines))
-	
-		i,contours,h = cv2.findContours(dilated_edges,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
-		max_w = 0
-		max_h = 0
-		iter_ = -1
-		count = 0
-		# print("contours",np.shape(contours))
-		for i,c1 in enumerate(contours):
-			# print i
-			# print("c1 = ", c1)
-			(x,y,we,he) = cv2.boundingRect(c1)
-			# print("bb params = ",x,y,we,he)
-
-			if len(c1)>4 and (we > 10 and he > 10):
-					if he>max_h or we>max_w:
-						max_h = he
-						max_w = we
-						iter_=i
-					count+=1
-		stencil = np.zeros(edges.shape).astype(edges.dtype)
-		color = [255, 255, 255]
-		cv2.fillPoly(stencil, contours[iter_], color)
-		# cv2.imshow('stencil',stencil)
-		# cv2.imwrite('stencil.jpg',stencil)
-		# cv2.waitKey(0)
-		cv2.destroyAllWindows()
-		hough_status, only_circles = self.rect_mask(stencil,edges)
-		# cv2.imwrite('circles.jpg', only_circles)
-		# cv2.imshow('ellipse only',only_circles)
-		# cv2.waitKey(0)
-		# cv2.destroyAllWindows()
-		# hough_status,houg_lines = self.get_hough_lines(stencil)
-		if(hough_status):
-
-			_,contours,h = cv2.findContours(only_circles,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
-			# print("h = ", h)
+		if(lines is not None):
+			# print("first hough lines shape",len(lines))
+		
+			i,contours,h = cv2.findContours(dilated_edges,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
 			max_w = 0
 			max_h = 0
 			iter_ = -1
 			count = 0
+			# print("contours",np.shape(contours))
 			for i,c1 in enumerate(contours):
+				# print i
+				# print("c1 = ", c1)
 				(x,y,we,he) = cv2.boundingRect(c1)
 				# print("bb params = ",x,y,we,he)
 
@@ -429,76 +362,86 @@ class BullsEyeDetection:
 							max_h = he
 							max_w = we
 							iter_=i
+						count+=1
+			stencil = np.zeros(edges.shape).astype(edges.dtype)
+			color = [255, 255, 255]
+			cv2.fillPoly(stencil, contours[iter_], color)
+			hough_status, only_circles = self.rect_mask(stencil,edges)
+			# hough_status,houg_lines = self.get_hough_lines(stencil)
+			if(hough_status):
 
-			# fit ellipse now
-			if(len(contours) != 0):
-				if(len(contours[iter_])>=5):
+				_,contours,h = cv2.findContours(only_circles,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
+				# print("h = ", h)
+				max_w = 0
+				max_h = 0
+				iter_ = -1
+				count = 0
+				for i,c1 in enumerate(contours):
+					(x,y,we,he) = cv2.boundingRect(c1)
+					# print("bb params = ",x,y,we,he)
 
-					(cx,cy),(Ma,ma),th = cv2.fitEllipse(contours[iter_])
-					th = math.radians(th)
-					cv2.drawContours(img, contours[iter_], -1, (0,255,0), 2)
+					if len(c1)>4 and (we > 10 and he > 10):
+							if he>max_h or we>max_w:
+								max_h = he
+								max_w = we
+								iter_=i
 
-					# print("ellipse = ",(cx,cy),(ma,Ma),th)
-					cv2.imwrite('ellipse_contour.jpg', img)
-					cv2.imshow('outer ellipse', img)
-					cv2.waitKey(0)
-					cv2.destroyAllWindows()
-					pts_src = np.array([[-self.tag_rad,0],\
-										[0,self.tag_rad],\
-										[self.tag_rad,0], \
-										[0,-self.tag_rad]])
-					pts_dst = np.array([[cx - Ma*np.cos(th)/2,cy - Ma*np.sin(th)/2],\
-										[cx - ma*np.sin(th)/2, cy + ma*np.cos(th)/2],\
-										[cx + Ma*np.cos(th)/2,cy + Ma*np.sin(th)/2],\
-										[cx + ma*np.sin(th)/2,cy - ma*np.cos(th)/2]])
-					# print("pts_dst",pts_dst)
+				# fit ellipse now
+				if(len(contours) != 0):
+					if(len(contours[iter_])>=5):
 
-					# H,status_h = cv2.findHomography(pts_src,pts_dst)
-					im_dst = np.zeros((240,320,3))
-					# H[0,2] = 0
-					# H[1,2] = 0
-					# print("H = ",H)
+						(cx,cy),(Ma,ma),th = cv2.fitEllipse(contours[iter_])
+						th = math.radians(th)
+						cv2.drawContours(img, contours[iter_], -1, (0,255,0), 2)
 
-					# print("im_dst size",im_dst.shape[1],im_dst.shape[0])
-					# im_out = cv2.warpPerspective(img, H, (im_dst.shape[1],im_dst.shape[0]))
-					rot,trans = self.pnp(pts_dst,img)
-					for i in range(4):
-						cv2.circle(original_img,(int(pts_dst[i,0]),int(pts_dst[i,1])),3,(0,0,255),-1)
+						# print("ellipse = ",(cx,cy),(ma,Ma),th)
+						# cv2.imshow('outer ellipse', img)
+						# cv2.waitKey(1)
+						#cv2.destroyAllWindows()
+						pts_src = np.array([[-self.tag_rad,0],\
+											[0,self.tag_rad],\
+											[self.tag_rad,0], \
+											[0,-self.tag_rad]])
+						pts_dst = np.array([[cx - Ma*np.cos(th)/2,cy - Ma*np.sin(th)/2],\
+											[cx - ma*np.sin(th)/2, cy + ma*np.cos(th)/2],\
+											[cx + Ma*np.cos(th)/2,cy + Ma*np.sin(th)/2],\
+											[cx + ma*np.sin(th)/2,cy - ma*np.cos(th)/2]])
+						# print("pts_dst",pts_dst)
 
-					center_pt = np.mean(pts_dst,axis=0)
-					cv2.circle(original_img,(int(center_pt[0]),int(center_pt[1])),3,(0,0,255),-1)
+						# H,status_h = cv2.findHomography(pts_src,pts_dst)
+						im_dst = np.zeros((240,320,3))
+						# H[0,2] = 0
+						# H[1,2] = 0
+						# print("H = ",H)
 
-					# print("transVec shape = ", trans.shape,trans)
-					# trans = np.reshape(trans,(3,1))
-					# print("centers shape = ", self.centers.shape)
+						# print("im_dst size",im_dst.shape[1],im_dst.shape[0])
+						# im_out = cv2.warpPerspective(img, H, (im_dst.shape[1],im_dst.shape[0]))
+						rot,trans = self.pnp(pts_dst,img)
+						# print("transVec shape = ", trans.shape,trans)
+						# trans = np.reshape(trans,(3,1))
+						# print("centers shape = ", self.centers.shape)
 
-					if(self.centers.shape[0]<self.filter_len):
-						self.centers = np.vstack((self.centers,np.array([trans[0,0],trans[1,0]])))
-					else:
-						self.centers = np.vstack((self.centers,np.array([trans[0,0],trans[1,0]])))
-						self.centers = np.delete(self.centers,0,0)
+						if(self.centers.shape[0]<self.filter_len):
+							self.centers = np.vstack((self.centers,np.array([trans[0,0],trans[1,0]])))
+						else:
+							self.centers = np.vstack((self.centers,np.array([trans[0,0],trans[1,0]])))
+							self.centers = np.delete(self.centers,0,0)
 
-					center_mean= np.mean(self.centers,axis = 0)
-					self.pose_obj.position.x = center_mean[0]			#in m
-					self.pose_obj.position.y = center_mean[1] 	#in m
-					self.pose_obj.position.z = trans[2,0]  	#in m
-					# self.pose_obj.orientation.x = 0
-					# self.pose_obj.orientation.y = 0
-					# self.pose_obj.orientation.z = 0
+						center_mean= np.mean(self.centers,axis = 0)
+						self.pose_obj.position.x = center_mean[0]			#in m
+						self.pose_obj.position.y = center_mean[1] 	#in m
+						# self.pose_obj.position.z = trans[2,0]  	#in m
+						# self.pose_obj.orientation.x = 0
+						# self.pose_obj.orientation.y = 0
+						# self.pose_obj.orientation.z = 0
 
-					# print("state x,y,z",self.pose_obj.position.x,self.pose_obj.position.y,self.pose_obj.position.z)
-					# self.pose_pub.publish(self.pose_obj)
-					cv2.putText(original_img,'x: '+str(float(center_mean[0])), (20,20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0),1, lineType=cv2.LINE_AA)
-					cv2.putText(original_img,'y: '+str(float(center_mean[1])), (20,40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0),1, lineType=cv2.LINE_AA)
-					cv2.putText(original_img,'z: '+str(float(trans[2,0])), (20,60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0),1, lineType=cv2.LINE_AA)
-
-					# cv2.imwrite('./video/'+str(self.i)+'.jpg', original_img)
-					# cv2.imshow("corners",original_img)
-					# cv2.waitKey(1)
-					self.i+=1
+						# print("state x,y,z",self.pose_obj.position.x,self.pose_obj.position.y,self.pose_obj.position.z)
+						# self.pose_pub.publish(self.pose_obj)
+					# cv2.imshow("warped img",im_out)
+					# cv2.waitKey(0)
 					# cv2.destroyAllWindows()
-				# else:
-				# 	print("can't fit ellipse. need at least 5 points")
+				else:
+					print("can't fit ellipse. need at least 5 points")
 
 				# print("I was able to detect outer rectangle")
 			else:
@@ -564,52 +507,32 @@ class BullsEyeDetection:
 		# cv2.waitKey(0)
 		# cv2.destroyAllWindows()
 
-	# def run_pipeline(self):
-	# 	if self.detect_flag == True:
-	# 		if self.image is not None:
-	# 			# cv2.imshow('cb', self.image)
-	# 			# cv2.waitKey(1)
-	# 			self.detect_ellipse_fitellipse(self.image,self.i)
-	# 			print("detecting")
-
-	# 		else:
-	# 			print("No image published")
-	# 		center_mean= np.mean(self.centers,axis = 0)
-	# 		self.pose_obj.position.x = center_mean[0]			#in m
-	# 		self.pose_obj.position.y = center_mean[1]
-	# 		self.pose_pub.publish(self.pose_obj)
-	# 	else:
-	# 		print("Node on stand")
-
-
-
 	def run_pipeline(self):
-		dirname = sorted(os.listdir(self.data_path))
-		i=1
-		for filename in dirname:
-		    #print("filename",filename)
-		    #print(os.path.join(self.data_path,filename))
-			img = cv2.imread(os.path.join(self.data_path,filename))
-			cv2.imwrite("original.jpg", img)
-			cv2.imshow("read img",img)
-			cv2.waitKey(0)
-			cv2.destroyAllWindows()
-			h,w,_ = img.shape	
-			#dim = (w/4,h/4)
-			#img = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
-			# print("img size = ",img.shape)
-			# self.detect_ellipse_hough(img)
-			self.detect_ellipse_fitellipse(img,i)
-			i+=1
+		if self.detect_flag == True:
+			if self.image is not None:
+				# cv2.imshow('cb', self.image)
+				# cv2.waitKey(1)
+				self.detect_ellipse_fitellipse(self.image)
+				print("detecting")
+
+			else:
+				print("No image published")
+			center_mean= np.mean(self.centers,axis = 0)
+			self.pose_obj.position.x = center_mean[0]			#in m
+			self.pose_obj.position.y = center_mean[1]
+			self.pose_pub.publish(self.pose_obj)
+		else:
+			print("Node on stand")
+
 
 def main():
-		# rospy.init_node('image_reader', anonymous=True)
+		rospy.init_node('image_reader', anonymous=True)
 		ob = BullsEyeDetection()
-		# rate = rospy.Rate(15)
-		# while(not rospy.is_shutdown()):
-		# 	ob.run_pipeline()
-		# 	rate.sleep()
-		ob.run_pipeline()
+		rate = rospy.Rate(15)
+		while(not rospy.is_shutdown()):
+			ob.run_pipeline()
+			rate.sleep()
+
 
 if __name__ == '__main__':
 		main()
