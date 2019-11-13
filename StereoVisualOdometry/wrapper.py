@@ -9,7 +9,7 @@ class StereoVO:
 	def __init__(self):
 		self.data_path = "/home/pratique/drone_course_data/StereoVisualOdometry/"
 		self.detect_corner_reset_num = 20
-		self.surf = cv2.xfeatures2d.SURF_create(hessianThreshold = 900)
+		# self.surf = cv2.xfeatures2d.SURF_create(hessianThreshold = 900)
 		self.feature_params = dict( maxCorners = 100,
 		               qualityLevel = 0.3,
 		               minDistance = 7,
@@ -21,6 +21,7 @@ class StereoVO:
 		                  criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 		# Create some random colors
 		self.color = np.random.randint(0,255,(100,3))
+		self.stereo = cv2.StereoBM_create(numDisparities=16, blockSize=15)
 
 	def get_optical_flow(self,curr_frame_3D, prev_frame_gray, prev_corners, mask, counter):
 		counter+=1
@@ -48,26 +49,27 @@ class StereoVO:
 		# cv2.imshow("right",prev_img_left)
 		# cv2.waitKey(0)
 		# cv2.destroyAllWindows()
-		draw_img_left = curr_frame_3D.copy()
+		# draw_img_left = curr_frame_3D.copy()
 		curr_frame_gray = cv2.cvtColor(curr_frame_3D, cv2.COLOR_BGR2GRAY)
 
 		# calculate optical flow
-		curr_corners, st, err = cv2.calcOpticalFlowPyrLK(prev_frame_gray, curr_frame_gray, prev_corners, None, **self.lk_params)
+		curr_corners, st, _ = cv2.calcOpticalFlowPyrLK(prev_frame_gray, curr_frame_gray, prev_corners, None, **self.lk_params)
 
 		# Select good points
 		good_curr = curr_corners[st==1]
 		good_prev = prev_corners[st==1]
 
 		# draw the tracks
-		for i,(new,old) in enumerate(zip(good_curr, good_prev)):
-		    a,b = new.ravel()
-		    c,d = old.ravel()
-		    mask = cv2.arrowedLine(mask, (c,d), (a,b), self.color[i].tolist(), 2, tipLength = 0.2)
-		    frame = cv2.circle(draw_img_left,(a,b),5,self.color[i].tolist(),-1)
-		img = cv2.add(frame,mask)
+		# for i,(new,old) in enumerate(zip(good_curr, good_prev)):
+		#     a,b = new.ravel()
+		#     c,d = old.ravel()
+		#     mask = cv2.arrowedLine(mask, (c,d), (a,b), self.color[i].tolist(), 2, tipLength = 0.2)
+		#     frame = cv2.circle(draw_img_left,(a,b),5,self.color[i].tolist(),-1)
 
-		cv2.imshow('frame',img)
-		cv2.waitKey(70)
+		# img = cv2.add(frame,mask)
+		# show optical flow vectors superimposed on image
+		# cv2.imshow('frame',img)
+		# cv2.waitKey(70)
 		# k = cv2.waitKey(70) & 0xff
 		# if k == 27:
 		#     break
@@ -82,9 +84,24 @@ class StereoVO:
 		return Optical_flow, prev_frame_gray, prev_corners, mask,counter
 
 
+	def get_depth(self, img_left, img_right):
+		img_left_gray = cv2.cvtColor(img_left, cv2.COLOR_BGR2GRAY)
+		img_right_gray = cv2.cvtColor(img_right, cv2.COLOR_BGR2GRAY)
+		disparity = self.stereo.compute(img_left_gray,img_right_gray)
+		disparity = np.float32(disparity)
+		disparity[disparity == 0.0] = 0.0001
+		# disparity3d = np.dstack((disparity,disparity,disparity))
+		# print('disparity max and min',np.amax(disparity),np.amin(disparity), np.mean(np.mean(disparity)))
+		print("mean disparity = {}".format(np.mean(np.mean(disparity))))
+		depth_map = np.reciprocal(disparity)
+		print("mean depth = {}".format(np.mean(np.mean(depth_map))))
+		cv2.imshow("disparity",depth_map)
+		cv2.waitKey(70)
+		return disparity
+
 	def run_pipeline(self):
 		dir_list_left = sorted(os.listdir(self.data_path+'Helix_left'))
-		dir_list_right = sorted(os.listdir(self.data_path+'Helix_right'))
+		# dir_list_right = sorted(os.listdir(self.data_path+'Helix_right'))
 		prev_img_left, prev_frame, prev_corners, mask = (None,)*4
 
 		counter = 0
@@ -106,6 +123,8 @@ class StereoVO:
 			if prev_img_left is not None:
 				prev_frame = cv2.cvtColor(prev_img_left,cv2.COLOR_BGR2GRAY)
 				Optical_flow, prev_frame, prev_corners, mask, counter = self.get_optical_flow(img_left, prev_frame, prev_corners, mask, counter)
+				disparity_map = self.get_depth(img_left, img_right)
+
 				
 			# update previous image
 			prev_img_left = img_left
