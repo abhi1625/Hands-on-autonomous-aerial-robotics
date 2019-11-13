@@ -21,7 +21,14 @@ class StereoVO:
 		                  criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
 		# Create some random colors
 		self.color = np.random.randint(0,255,(100,3))
-		self.stereo = cv2.StereoBM_create(numDisparities=16, blockSize=15)
+		self.stereo = cv2.StereoBM_create(numDisparities=16, blockSize=15)\
+		self.K_stereo = np.array([  [103.97, 0, 208.105],
+									[0, 103.97, 114.713],
+									[0, 0, 1]
+											], dtype=np.float32)
+		self.f_stereo = 103.97   #cm
+		self.baseline_stereo = 3.0 #cm
+
 
 	def get_optical_flow(self,curr_frame_3D, prev_frame_gray, prev_corners, mask, counter):
 		counter+=1
@@ -93,7 +100,7 @@ class StereoVO:
 		# disparity3d = np.dstack((disparity,disparity,disparity))
 		# print('disparity max and min',np.amax(disparity),np.amin(disparity), np.mean(np.mean(disparity)))
 		print("mean disparity = {}".format(np.mean(np.mean(disparity))))
-		depth_map = np.reciprocal(disparity)
+		depth_map = np.reciprocal(disparity)*self.baseline_stereo*self.f_stereo
 		print("mean depth = {}".format(np.mean(np.mean(depth_map))))
 		cv2.imshow("disparity",depth_map)
 		cv2.waitKey(70)
