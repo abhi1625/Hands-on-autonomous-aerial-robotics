@@ -3,13 +3,13 @@
 
 from pyquaternion import Quaternion
 import numpy as np
-from scipy.spatial.transform import Rotation
+# from scipy.spatial.transform import Rotation
 import matplotlib.pyplot as plt
 import math
 import scipy.io
 import sys
-import pandas as pd
-pd.set_option('display.float_format', lambda x: '%.4f' % x)
+# import pandas as pd
+# pd.set_option('display.float_format', lambda x: '%.4f' % x)
 import csv
 import argparse
 
@@ -39,7 +39,7 @@ def quaternConj(q):
 
 
 class madgwick:
-	def __init__(self,q=Quaternion(1,0,0,0),beta = 0.5,invSampleFreq = 1.0/100.0 ):
+	def __init__(self,q=Quaternion(1,0,0,0),beta = 0.7,invSampleFreq = 1.0/100.0 ):
 		self.beta = beta
 		w,x,y,z = q 
 		self.q_new = np.array([[w],[x],[y],[z]])
@@ -138,7 +138,7 @@ def main():
 	acc_bias = imu_params['IMUParams'][1]
 	Parser = argparse.ArgumentParser()
 
-	Parser.add_argument('--imu_data', default=' ',help="The path of data file being used")
+	Parser.add_argument('--imu_data', default='IMUParams.mat',help="The path of data file being used")
 	Parser.add_argument('--vicon_data', default=' ',help="The path of vicon data file being used")
 	Args = Parser.parse_args()
 

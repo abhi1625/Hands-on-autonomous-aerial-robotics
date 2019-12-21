@@ -4,7 +4,7 @@
 * Execute the following command to run the code: 
 
 ```
-python madgwick.py --imu_data=../Data/Train/IMU/imuRaw3.mat --vicon_data=../Data/Train/Vicon/viconRot3.mat
+python madgwick.py --imu_data=./Data/Train/IMU/imuRaw3.mat --vicon_data=./Data/Train/Vicon/viconRot3.mat
 ```
 
 * There are two command line arguments:
