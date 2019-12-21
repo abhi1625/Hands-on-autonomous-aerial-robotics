@@ -8,28 +8,45 @@ import matplotlib.pyplot as plt
 import math
 import scipy.io
 import sys
-# import pandas as pd
-# pd.set_option('display.float_format', lambda x: '%.4f' % x)
+import pandas as pd
+pd.set_option('display.float_format', lambda x: '%.4f' % x)
 import csv
 import argparse
 
 
 
-def quat_to_euler(q):
-	w,x,y,z = np.float64(q)
-	R11 = 1-2*(y**2 +z**2)
-	R21 = 2*(w*z + x*y)
-	R31 = 2*(-x*z+w*y)
-	R32 = 2*(y*z+w*x)
-	R33 = 2*(w**2)-1+2*(z**2)
-	if R31**2 >=1.0:
-		# print "true"
-		R31 = 0.99499
+# def quat_to_euler(q):
+# 	w,x,y,z = np.float64(q)
+# 	R11 = 1-2*(y**2 +z**2)
+# 	R21 = 2*(w*z + x*y)
+# 	R31 = 2*(-x*z+w*y)
+# 	R32 = 2*(y*z+w*x)
+# 	R33 = 2*(w**2)-1+2*(z**2)
+# 	if R31**2 >=1.0:
+# 		# print "true"
+# 		R31 = 0.99499
 
-	phi = math.atan2(R32, R33 )*(180/np.pi);
-	theta = math.atan(R31/math.sqrt(1-R31**2) )*(180/np.pi);
-	psi = math.atan2(R21, R11 )*(180/np.pi);
-	return phi, theta, psi
+# 	phi = math.atan2(R32, R33 )*(180/np.pi);
+# 	theta = math.atan(R31/math.sqrt(1-R31**2) )*(180/np.pi);
+# 	psi = math.atan2(R21, R11 )*(180/np.pi);
+# 	return phi, theta, psi
+
+
+def quat_to_euler(q):
+    w,x,y,z = q
+    R11 = 2*(w**2)-1+2*(x**2)
+    R21 = 2*(x*y-w*z)
+    R31 = 2*(x*z+w*y)
+    R32 = 2*(y*z-w*x)
+    R33 = 2*(w**2)-1+2*(z**2)
+    if R31**2 >=1.0:
+    	# print "true"
+    	R31 = 0.99499
+    
+    phi = math.atan2(R32, R33 )*(180/np.pi);
+    theta = -math.atan(R31/math.sqrt(1-R31**2) )*(180/np.pi);
+    psi = math.atan2(R21, R11 )*(180/np.pi);
+    return phi, theta, psi
 
 def quaternConj(q):
     w,x,y,z = q
@@ -138,7 +155,7 @@ def main():
 	acc_bias = imu_params['IMUParams'][1]
 	Parser = argparse.ArgumentParser()
 
-	Parser.add_argument('--imu_data', default='IMUParams.mat',help="The path of data file being used")
+	Parser.add_argument('--imu_data', default=' ',help="The path of data file being used")
 	Parser.add_argument('--vicon_data', default=' ',help="The path of vicon data file being used")
 	Args = Parser.parse_args()
 
