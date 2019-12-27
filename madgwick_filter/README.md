@@ -1,5 +1,16 @@
 # Instruction to run the code
+
+* Install dependencies:
+```
+sudo -H pip install pyquaternion
+sudo -H pip install pandas
+```
+
 * Navigate to the code directory
+```
+cd madgwick_filter
+```
+
 
 * Execute the following command to run the code: 
 

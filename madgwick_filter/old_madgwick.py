@@ -8,55 +8,29 @@ import matplotlib.pyplot as plt
 import math
 import scipy.io
 import sys
-import pandas as pd
-pd.set_option('display.float_format', lambda x: '%.4f' % x)
+# import pandas as pd
+# pd.set_option('display.float_format', lambda x: '%.4f' % x)
 import csv
 import argparse
 
 
 
 def quat_to_euler(q):
-    w,x,y,z = q/np.linalg.norm(q)
-    R11 = 1 - 2*(y*y + z*z)
-    R21 = 2*(w*z+x+y)
-    R31 = 2*(w*y - x*z)
-    R32 = 2*(w*x + y*z)
-    R33 = 1-2*(x*x+y*y)
+    w,x,y,z = q
+    R11 = 1-2*(y**2 +z**2)
+    R21 = 2*(w*z + x*y)
+    R31 = 2*(x*z+w*y)
+    R32 = 2*(y*z-w*x)
+    R33 = 2*(w**2)-1+2*(z**2)
+    if R31**2 >=1.0:
+    	# print "true"
+    	R31 = 0.99499
     
-    
-    phi = math.atan2(R32, R33)
-
-    if(abs(R31)>=1):
-    	theta = 90.0
-    elif(abs(R31)<=-1):
-    	theta = -90.0
-    else:
-    	theta = math.asin(R31)
-    
-    psi = math.atan2(R21, R11)
-
-    phi = phi*(180/np.pi)
-    theta = theta*(180/np.pi)
-    psi = psi*(180/np.pi)
-    
+    phi = math.atan2(R32, R33 )*(180/np.pi);
+    theta = -math.atan(R31/math.sqrt(1-R31**2) )*(180/np.pi);
+    psi = math.atan2(R21, R11 )*(180/np.pi);
     return phi, theta, psi
 
-
-# def quat_to_euler(q):
-#     w,x,y,z = q
-#     R11 = 2*(w**2)-1+2*(x**2)
-#     R21 = 2*(x*y-w*z)
-#     R31 = 2*(x*z+w*y)
-#     R32 = 2*(y*z-w*x)
-#     R33 = 2*(w**2)-1+2*(z**2)
-#     if R31**2 >=1.0:
-#     	# print "true"
-#     	R31 = 0.99499
-    
-#     phi = math.atan2(R32, R33 )*(180/np.pi)
-#     theta = -math.atan(R31/math.sqrt(1-R31**2) )*(180/np.pi)
-#     psi = math.atan2(R21, R11 )*(180/np.pi)
-#     return phi, theta, psi
 
 def quaternConj(q):
     w,x,y,z = q
@@ -66,7 +40,7 @@ def quaternConj(q):
 
 
 class madgwick:
-	def __init__(self,q=Quaternion(1,0,0,0),beta = 0.3,invSampleFreq = 1.0/100.0 ):
+	def __init__(self,q=Quaternion(1,0,0,0),beta = 0.9,invSampleFreq = 1.0/100.0 ):
 		self.beta = beta
 		w,x,y,z = q 
 		self.q_new = np.array([[w],[x],[y],[z]])
@@ -173,7 +147,7 @@ def main():
 	vicon_data = Args.vicon_data
 	
 	data = scipy.io.loadmat(imu_data)
-	# print data
+	print data
 	
 	time_stamp = data['ts']
 	# print "ts_imu, ", time_stamp[0]
@@ -190,7 +164,7 @@ def main():
 	# print gyro.shape
 	# input('a')
 	align_num = 0	
-	align_minus = 160
+	align_minus = 30
 	acc_all,gyro_all = process_data(acc,acc_scale,acc_bias,gyro)
 	q_est = Quaternion(1,0,0,0)
 	q_init = Quaternion(1,0,0,0)
@@ -242,7 +216,7 @@ def main():
 
 	# app_angles = np.zeros((1,align_num))
 	# angles = np.concatenate(app_angles,angles)
-	# print("after angle shape = ", angles.shape)
+	print("after angle shape = ", angles.shape)
 	t = np.linspace(1,int(acc_all.shape[1]),num = int(acc_all.shape[1]))
 	t_angles = np.linspace(1,int(angles.shape[0]),num = int(angles.shape[0]))
 	fig=plt.figure(1)
